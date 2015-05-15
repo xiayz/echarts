@@ -3,6 +3,7 @@
  *
  * @desc echarts基于Canvas，纯Javascript图表库，提供直观，生动，可交互，可个性化定制的数据统计图表。
  * @author Kener (@Kener-林峰, kener.linfeng@gmail.com)
+ *         Yi Shen (https://github.com/pissang)
  *
  * 直角坐标系中坐标轴数组，数组中每一项代表一条横轴（纵轴）坐标轴。
  * 标准（1.0）中规定最多同时存在2条横轴和2条纵轴
@@ -11,17 +12,31 @@
  * 坐标轴有两种类型，类目型和数值型（区别详见axis）：
  *    横轴通常为类目型，但条形图时则横轴为数值型，散点图时则横纵均为数值型
  *    纵轴通常为数值型，但条形图时则纵轴为类目型。
+ * 
+ * TODO 
+ * * Time formattter
+ * * Label rotation
  *
  */
 define(function (require) {
     var Base = require('./base');
 
     var LineShape = require('zrender/shape/Line');
+    var TextShape = require('zrender/shape/Text');
+    var RectShape = require('zrender/shape/Rectangle');
 
     var ecConfig = require('../config');
     var ecData = require('../util/ecData');
+    var number = require('../util/number');
+
     var zrUtil = require('zrender/tool/util');
     var zrColor = require('zrender/tool/color');
+
+    var component = require('../component');
+
+    function isHorizontal (position) {
+        return position === 'top' || position === 'bottom';
+    }
 
     /**
      * 构造函数
@@ -31,315 +46,449 @@ define(function (require) {
      *     @param {string=} option.xAxis.type 坐标轴类型，横轴默认为类目型'category'
      *     @param {string=} option.yAxis.type 坐标轴类型，纵轴默认为类目型'value'
      * @param {Object} component 组件
-     * @param {string} axisType 横走or纵轴
      */
-    function Axis(ecTheme, messageCenter, zr, option, myChart, axisType) {
+    function Axis(ecTheme, messageCenter, zr, option, myChart) {
         Base.call(this, ecTheme, messageCenter, zr, option, myChart);
-
-        this.axisType = axisType;
-        this._axisList = [];
 
         this.refresh(option);
     }
 
     Axis.prototype = {
         type: ecConfig.COMPONENT_TYPE_AXIS,
-        axisBase: {
-            // 轴线
-            _buildAxisLine: function () {
-                var lineWidth = this.option.axisLine.lineStyle.width;
-                var halfLineWidth = lineWidth / 2;
-                var axShape = {
-                    _axisShape: 'axisLine',
-                    zlevel: this.getZlevelBase(),
-                    z: this.getZBase() + 3,
-                    hoverable: false
-                };
-                var grid = this.grid;
-                switch (this.option.position) {
-                    case 'left' :
-                        axShape.style = {
-                            xStart: grid.getX() - halfLineWidth,
-                            yStart: grid.getYend(),
-                            xEnd: grid.getX() - halfLineWidth,
-                            yEnd: grid.getY(),
-                            lineCap: 'round'
-                        };
-                        break;
-                    case 'right' :
-                        axShape.style = {
-                            xStart: grid.getXend() + halfLineWidth,
-                            yStart: grid.getYend(),
-                            xEnd: grid.getXend() + halfLineWidth,
-                            yEnd: grid.getY(),
-                            lineCap: 'round'
-                        };
-                        break;
-                    case 'bottom' :
-                        axShape.style = {
-                            xStart: grid.getX(),
-                            yStart: grid.getYend() + halfLineWidth,
-                            xEnd: grid.getXend(),
-                            yEnd: grid.getYend() + halfLineWidth,
-                            lineCap: 'round'
-                        };
-                        break;
-                    case 'top' :
-                        axShape.style = {
-                            xStart: grid.getX(),
-                            yStart: grid.getY() - halfLineWidth,
-                            xEnd: grid.getXend(),
-                            yEnd: grid.getY() - halfLineWidth,
-                            lineCap: 'round'
-                        };
-                        break;
-                }
-                var style = axShape.style;
-                if (this.option.name !== '') { // 别帮我代码规范
-                    style.text = this.option.name;
-                    style.textPosition = this.option.nameLocation;
-                    style.textFont = this.getFont(this.option.nameTextStyle);
-                    if (this.option.nameTextStyle.align) {
-                        style.textAlign = this.option.nameTextStyle.align;
-                    }
-                    if (this.option.nameTextStyle.baseline) {
-                        style.textBaseline = this.option.nameTextStyle.baseline;
-                    }
-                    if (this.option.nameTextStyle.color) {
-                        style.textColor = this.option.nameTextStyle.color;
-                    }
-                }
-                style.strokeColor = this.option.axisLine.lineStyle.color;
 
-                style.lineWidth = lineWidth;
-                // 亚像素优化
-                if (this.isHorizontal()) {
-                    // 横向布局，优化y
-                    style.yStart
-                        = style.yEnd
-                        = this.subPixelOptimize(style.yEnd, lineWidth);
-                }
-                else {
-                    // 纵向布局，优化x
-                    style.xStart
-                        = style.xEnd
-                        = this.subPixelOptimize(style.xEnd, lineWidth);
-                }
+        refresh: function (newOption) {
 
-                style.lineType = this.option.axisLine.lineStyle.type;
+            if (newOption) {
+                this.option = this.reformOption(newOption);
+            }
+            var option = this.option;
 
-                axShape = new LineShape(axShape);
-                this.shapeList.push(axShape);
-            },
+            var grid = this.component.grid;
 
-            _axisLabelClickable: function(clickable, axShape) {
-                if (clickable) {
-                    ecData.pack(
-                        axShape, undefined, -1, undefined, -1, axShape.style.text
-                    );
-                    axShape.hoverable = true;
-                    axShape.clickable = true;
-                    axShape.highlightStyle = {
-                        color: zrColor.lift(axShape.style.color, 1),
-                        brushType: 'fill'
-                    };
-                    return axShape;
-                }
-                else {
-                    return axShape;
-                }
-            },
+            var axisType = this.type;
+            var axisTypeShort = axisType.slice(0, 1);
+            var axesOption = option[axisType];
 
-            refixAxisShape: function(zeroX, zeroY) {
-                if (!this.option.axisLine.onZero) {
-                    return;
-                }
-                var tickLength;
-                if (this.isHorizontal() && zeroY != null) {
-                    // 横向布局调整纵向y
-                    for (var i = 0, l = this.shapeList.length; i < l; i++) {
-                        if (this.shapeList[i]._axisShape === 'axisLine') {
-                            this.shapeList[i].style.yStart
-                                = this.shapeList[i].style.yEnd
-                                = this.subPixelOptimize(
-                                    zeroY, this.shapeList[i].stylelineWidth
-                                );
-                            this.zr.modShape(this.shapeList[i].id);
-                        }
-                        else if (this.shapeList[i]._axisShape === 'axisTick') {
-                            tickLength = this.shapeList[i].style.yEnd
-                                         - this.shapeList[i].style.yStart;
-                            this.shapeList[i].style.yStart = zeroY - tickLength;
-                            this.shapeList[i].style.yEnd = zeroY;
-                            this.zr.modShape(this.shapeList[i].id);
-                        }
-                    }
-                }
-                if (!this.isHorizontal() && zeroX != null) {
-                    // 纵向布局调整横向x
-                    for (var i = 0, l = this.shapeList.length; i < l; i++) {
-                        if (this.shapeList[i]._axisShape === 'axisLine') {
-                            this.shapeList[i].style.xStart
-                                = this.shapeList[i].style.xEnd
-                                = this.subPixelOptimize(
-                                    zeroX, this.shapeList[i].stylelineWidth
-                                );
-                            this.zr.modShape(this.shapeList[i].id);
-                        }
-                        else if (this.shapeList[i]._axisShape === 'axisTick') {
-                            tickLength = this.shapeList[i].style.xEnd
-                                         - this.shapeList[i].style.xStart;
-                            this.shapeList[i].style.xStart = zeroX;
-                            this.shapeList[i].style.xEnd = zeroX + tickLength;
-                            this.zr.modShape(this.shapeList[i].id);
-                        }
-                    }
-                }
-            },
-
-            getPosition: function () {
-                return this.option.position;
-            },
-
-            isHorizontal: function() {
-                return this.option.position === 'bottom' || this.option.position === 'top';
+            for (var i = 0; i < axesOption.length; i++) {
+                var axis = grid.getAxis(axisTypeShort, i);
+                this._buildShape(axis, axesOption[i]);
             }
         },
-        /**
-         * 参数修正&默认值赋值，重载基类方法
-         * @param {Object} opt 参数
-         */
-        reformOption: function (opt) {
-            // 不写或传了个空数值默认为数值轴
-            if (!opt || (opt instanceof Array && opt.length === 0)) {
-                opt = [ { type: ecConfig.COMPONENT_TYPE_AXIS_VALUE } ];
-            }
-            else if (!(opt instanceof Array)){
-                opt = [opt];
-            }
 
-            // 最多两条，其他参数忽略
-            if (opt.length > 2) {
-                opt = [opt[0], opt[1]];
-            }
+        _buildShape: function (axis, option) {
 
-            if (this.axisType === 'xAxis') {
-                // 横轴位置默认配置
-                if (!opt[0].position            // 没配置或配置错
-                    || (opt[0].position != 'bottom' && opt[0].position != 'top')
-                ) {
-                    opt[0].position = 'bottom';
+            option.axisLine.show && this._buildAxisLine(axis, option);
+            option.axisTick.show && this._buildAxisTick(axis, option);
+            option.axisLabel.show && this._buildAxisLabel(axis, option);
+            
+            this._buildSplitLineArea(axis, option);
+
+            var shapeList = this.shapeList;
+            for (var i = 0, l = shapeList.length; i < l; i++) {
+                this.zr.addShape(shapeList[i]);
+            }
+        },
+
+        // 轴线
+        _buildAxisLine: function (axis, option) {
+            var lineStyleOption = option.axisLine.lineStyle;
+            var lineWidth = lineStyleOption.width;
+            var halfLineWidth = lineWidth / 2;
+            var grid = this.component.grid;
+
+            var axShape = new LineShape({
+                zlevel: this.getZlevelBase(),
+                z: this.getZBase() + 3,
+                hoverable: false,
+
+                style: {
+                    lineCap: 'round',
+                    lineWidth: lineWidth,
+                    lineType: lineStyleOption.type,
+                    strokeColor: lineStyleOption.color,
                 }
-                if (opt.length > 1) {
-                    opt[1].position = opt[0].position === 'bottom' ? 'top' : 'bottom';
-                }
+            });
 
-                for (var i = 0, l = opt.length; i < l; i++) {
-                    // 坐标轴类型，横轴默认为类目型'category'
-                    opt[i].type = opt[i].type || 'category';
-                    // 标识轴类型&索引
-                    opt[i].xAxisIndex = i;
-                    opt[i].yAxisIndex = -1;
+            var xStart;
+            var yStart;
+            var xEnd;
+            var yEnd;
+
+            var x0 = grid.getX();
+            var y0 = grid.getY();
+            var x1 = grid.getXend();
+            var y1 = grid.getYend();
+
+            var zeroCoord = axis.dataToCoord(0, true);
+            var onZero = option.axisLine.onZero;
+
+            // Sub pixel optimize
+            var offset = (1 - lineWidth % 2) / 2;
+            halfLineWidth += offset;
+            switch (axis.position) {
+                case 'left':
+                    if (onZero) {
+                        xStart = xEnd = zeroCoord;
+                    }
+                    else {
+                        xStart = xEnd = x0 - halfLineWidth;   
+                    }
+                    yStart = y1;
+                    yEnd = y0;
+                    break;
+                case 'right':
+                    if (onZero) {
+                        xStart = xEnd = zeroCoord;
+                    }
+                    else {
+                        xStart = xEnd = x1 + halfLineWidth;
+                    }
+                    yStart = y1;
+                    yEnd = y0;
+                    break;
+                case 'bottom':
+                    xStart = x0;
+                    xEnd = x1;
+                    if (onZero) {
+                        yStart = yEnd = zeroCoord;
+                    }
+                    else {
+                        yStart = yEnd = y1 + halfLineWidth;
+                    }
+                    break;
+                case 'top':
+                    xStart = x0;
+                    xEnd = x1;
+                    if (onZero) {
+                        yStart = yEnd = zeroCoord;
+                    }
+                    else {
+                        yStart = yEnd = y1 - halfLineWidth;
+                    }
+                    break;
+            }
+            var style = axShape.style;
+            var nameTextStyleOption = option.nameTextStyle;
+            if (option.name !== '') { // 别帮我代码规范
+                style.text = option.name;
+                style.textPosition = option.nameLocation;
+                style.textFont = this.getFont(nameTextStyleOption);
+                if (nameTextStyleOption.align) {
+                    style.textAlign = nameTextStyleOption.align;
+                }
+                if (nameTextStyleOption.baseline) {
+                    style.textBaseline = nameTextStyleOption.baseline;
+                }
+                if (nameTextStyleOption.color) {
+                    style.textColor = nameTextStyleOption.color;
+                }
+            }
+
+            this.shapeList.push(axShape);
+        },
+
+        _buildAxisTick: function (axis, option) {
+            var tickOption = option.axisTick;
+
+            var lineStyleOption = tickOption.lineStyle;
+            var tickLen = tickOption.length;
+            var tickColor = lineStyleOption.color;
+            var tickLineWidth = lineStyleOption.width;
+            var grid = this.component.grid;
+
+            var x0 = grid.getX();
+            var y0 = grid.getY();
+
+            // Sub pixel optimize
+            var offset = (1 - tickLineWidth % 2) / 2;
+
+            var offX = 0;
+            var offY = 0;
+
+            var stepX = 0;
+            var stepY = 0;
+
+            var axisPosition = axis.position;
+
+            if (isHorizontal(axisPosition)) {
+                offY = axisPosition === 'top' ? -tickLen : tickLen;
+                stepX = 1;
+            }
+            else {
+                offX = axisPosition === 'left' ? -tickLen : tickLen;
+                stepY = 1;
+            }
+            if (tickOption.inside) {
+                offX = -offX;
+                offY = -offY;
+            }
+
+            var ticksCoords = axis.getTicksCoords();
+
+            for (var i = 0; i < ticksCoords.length; i++) {
+                var tickCoord = ticksCoords[i] + offset;
+
+                var x = x0 + tickCoord * stepX;
+                var y = y0 + tickCoord * stepY;
+
+                // Tick line
+                var shape = new LineShape({
+                    zlevel: this.getZlevelBase(),
+                    z: this.getZBase(),
+                    hoverable: false,
+                    style: {
+                        xStart: x,
+                        yStart: y,
+                        xEnd: x + offX,
+                        yEnd: y + offY,
+                        strokeColor: tickColor,
+                        lineWidth: tickLineWidth
+                    }
+                });
+
+                this.shapeList.push(shape);
+            }
+        },
+
+        _buildAxisLabel: function (axis, option) {
+            var grid = this.component.grid;
+            
+            var labelOption = option.axisLabel;
+            var labelMargin = labelOption.margin;
+            var textStyle = labelOption.textStyle;
+
+            var labelMarginX = 0;
+            var labelMarginY = 0;
+            var labelTextAlign = 'center';
+            var labelTextBaseline = 'middle';
+            var labelRotate = labelOption.rotate;
+
+            var stepX = 0;
+            var stepY = 0;
+
+            var axisPosition = axis.position;
+
+            if (isHorizontal(axisPosition)) {
+                stepX = 1;
+                if (axisPosition === 'top') {
+                    labelMarginY = -labelMargin;
+                    labelTextBaseline = 'bottom';
+                }
+                else {
+                    labelMarginY = labelMargin;
+                    labelTextBaseline = 'top';
                 }
             }
             else {
-                // 纵轴位置默认配置
-                if (!opt[0].position            // 没配置或配置错
-                    || (opt[0].position != 'left'  && opt[0].position != 'right')
-                ) {
-                    opt[0].position = 'left';
-                }
-
-                if (opt.length > 1) {
-                    opt[1].position = opt[0].position === 'left' ? 'right' : 'left';
-                }
-
-                for (var i = 0, l = opt.length; i < l; i++) {
-                    // 坐标轴类型，纵轴默认为数值型'value'
-                    opt[i].type = opt[i].type || 'value';
-                    // 标识轴类型&索引
-                    opt[i].xAxisIndex = -1;
-                    opt[i].yAxisIndex = i;
-                }
-            }
-
-            return opt;
-        },
-
-        /**
-         * 刷新
-         */
-        refresh: function (newOption) {
-            var axisOption;
-            if (newOption) {
-                this.option = newOption;
-                if (this.axisType === 'xAxis') {
-                    this.option.xAxis = this.reformOption(newOption.xAxis);
-                    axisOption = this.option.xAxis;
+                stepY = 1;
+                if (axisPosition === 'left') {
+                    labelMarginX = -labelMargin;
+                    labelTextAlign = 'right';
                 }
                 else {
-                    this.option.yAxis = this.reformOption(newOption.yAxis);
-                    axisOption = this.option.yAxis;
+                    labelMarginX = labelMargin;
+                    labelTextAlign = 'left';
                 }
-                this.series = newOption.series;
             }
 
-            var CategoryAxis = require('./categoryAxis');
-            var ValueAxis = require('./valueAxis');
-            var len = Math.max((axisOption && axisOption.length || 0), this._axisList.length);
-            for (var i = 0; i < len; i++) {
-                if (this._axisList[i]   // 已有实例
-                    && newOption        // 非空刷新
-                    && (!axisOption[i] || this._axisList[i].type != axisOption[i].type) // 类型不匹配
-                ) {
-                    this._axisList[i].dispose && this._axisList[i].dispose();
-                    this._axisList[i] = false;
+            var formatter = labelOption.formatter;
+            if (! formatter) {
+                // Default formatter
+                switch (option.type) {
+                    // TODO
+                    case 'log':
+                    default:
+                        formatter = this.numAddCommas;
                 }
+            }
+            else if (typeof formatter === 'string') {
+                formatter = (function (tpl) {
+                    return function (val) {
+                        return tpl.replace({'value}', val);
+                    }
+                })(formatter);
+            }
 
-                if (this._axisList[i]) {
-                    this._axisList[i].refresh && this._axisList[i].refresh(
-                        axisOption ? axisOption[i] : false,
-                        this.series
-                    );
+            var ticks = axis.scale.getTicks();
+            var x0 = grid.getX();
+            var y0 = grid.getY();
+
+            for (var i = 0; i < ticks.length; i++) {
+                var tick = ticks[i];
+                var tickCoord = axis.dataToCoord(tick);
+
+                if (option.type === 'time') {
+                    // TODO
                 }
-                else if (axisOption && axisOption[i]) {
-                    this._axisList[i] = axisOption[i].type === 'category'
-                        ? new CategoryAxis(
-                               this.ecTheme, this.messageCenter, this.zr,
-                               axisOption[i], this.myChart, this.axisBase
-                           )
-                        : new ValueAxis(
-                               this.ecTheme, this.messageCenter, this.zr,
-                               axisOption[i], this.myChart, this.axisBase,
-                               this.series
-                        );
-                }
+                var text = formatter(tick);
+
+                var shape = new TextShape({
+                    zlevel: this.getZlevelBase(),
+                    z: this.getZBase(),
+                    hoverable: false,
+                    style: {
+                        x: x0 + tickCoord * stepX + labelMarginX,
+                        y: y0 + tickCoord * stepY + labelMarginY,
+
+                        text: text,
+                        textFont: this.getFont(textStyle),
+                        textAlign: labelTextAlign,
+                        textBaseline: labelTextBaseline
+                    }
+                });
+
+                this.shapeList.push(shape);
             }
         },
 
-        /**
-         * 根据值换算位置
-         * @param {number} idx 坐标轴索引0~1
-         */
-        getAxis: function (idx) {
-            return this._axisList[idx];
-        },
+        _buildSplitLineArea: function (axis, option) {
+            var grid = this.component.grid;
 
-        getAxisCount: function () {
-            return this._axisList.length;
-        },
+            var splitLineOption = option.splitLine;
+            var splitLineStyleOption = splitLineOption.lineStyle;
+            var lineWidth = splitLineStyleOption.width;
+            var lineColor = splitLineStyleOption.color;
 
-        clear: function () {
-            for (var i = 0, l = this._axisList.length; i < l; i++) {
-                this._axisList[i].dispose && this._axisList[i].dispose();
+            var splitAreaOption = option.splitArea;
+            var splitAreaStyleOption = splitAreaOption.areaStyle;
+            var areaColor = splitAreaStyleOption.color;
+
+            lineColor = lineColor instanceof Array ? lineColor : [lineColor];
+            areaColor = areaColor instanceof Array ? areaColor : [areaColor];
+
+            var lineColorLen = lineColor.length;
+            var areaColorLen = areaColor.length;
+
+            var offset = (1 - lineWidth % 2) / 2;
+
+            var x0 = grid.getX();
+            var y0 = grid.getY();
+            var x1 = grid.getXend();
+            var y1 = grid.getYend();
+
+            var ticksCoords = axis.getTicksCoords();
+            var shapeList = this.shapeList;
+            var zlevel = this.getZlevelBase();
+            var z = this.getZBase();
+
+            var _isHorizontal = isHorizontal(axis.position);
+
+            var prevX = 0;
+            var prevY = 0;
+            for (var i = 0; i < ticksCoords.length; i++) {
+
+                var tickCoord = ticksCoords[i];
+                var x = x0 + tickCoord + offset;
+                var y = y0 + tickCoord + offset;
+
+                // Draw split line
+                if (splitLineOption.show) {
+                    var shape = new LineShape({
+                        zlevel: zlevel,
+                        z: z,
+                        hoverable: false,
+                        style: {
+                            strokeColor: lineColor[i % lineColorLen],
+                            lineType: splitLineStyleOption.type,
+                            lineWidth: lineWidth
+                        }
+                    });
+
+                    var shapeStyle = shape.style;
+                    if (_isHorizontal) {
+                        shapeStyle.xStart = shapeStyle.xEnd = x;
+                        shapeStyle.yStart = y0;
+                        shapeStyle.yEnd = y1;
+                    }
+                    else {
+                        shapeStyle.yStart = shapeStyle.yEnd = y;
+                        shapeStyle.xStart = x0;
+                        shapeStyle.xEnd = x1;
+                    }
+
+                    shapeList.push(shape);
+                }
+
+                // Draw split area
+                if (splitAreaOption.show && i > 0) {
+                    var shape = new RectShape({
+                        zlevel: zlevel,
+                        z: z,
+                        hoverable: false,
+                        style: {
+                            color: areaColor[i % areaColorLen]
+                        }
+                    });
+                    var shapeStyle = shape.style;
+                    if (_isHorizontal) {
+                        shapeStyle.x = prevX;
+                        shapeStyle.y = y0;
+                        // Math.abs in case coords is decreasing.
+                        shapeStyle.width = Math.abs(x - prevX);
+                        shapeStyle.height = y1 - y0;
+                    }
+                    else {
+                        shapeStyle.x = x0;
+                        shapeStyle.y = prevY;
+                        shapeStyle.width = x1 - x0;
+                        shapeStyle.height = Math.abs(y - prevY);
+                    }
+                    shapeList.push(shape);
+                }
+
+                prevX = x;
+                prevY = y;
             }
-            this._axisList = [];
+        },
+
+        _axisLabelClickable: function(clickable, axShape) {
+            if (clickable) {
+                ecData.pack(
+                    axShape, undefined, -1, undefined, -1, axShape.style.text
+                );
+                axShape.hoverable = true;
+                axShape.clickable = true;
+                axShape.highlightStyle = {
+                    color: zrColor.lift(axShape.style.color, 1),
+                    brushType: 'fill'
+                };
+                return axShape;
+            }
+            else {
+                return axShape;
+            }
         }
     };
 
     zrUtil.inherits(Axis, Base);
 
-    require('../component').define('axis', Axis);
+    // X Axis
+    var XAxis = function () {
+        Axis.apply(this, arguments);
+    };
+    XAxis.prototype = {
+        
+        constructor: XAxis,
+
+        type: ecConfig.COMPONENT_TYPE_X_AXIS
+    };
+    zrUtil.inherits(XAxis, Base);
+
+    // Y Axis
+    var YAxis = function () {
+        Axis.apply(this, arguments);
+    };
+    YAxis.prototype = {
+        
+        constructor: YAxis,
+
+        type: ecConfig.COMPONENT_TYPE_X_AXIS
+    };
+    zrUtil.inherits(YAxis, Base);
+
+    component.define('axis', Axis);
+    component.define('xAxis', XAxis);
+    component.define('yAxis', YAxis);
 
     return Axis;
 });

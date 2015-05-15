@@ -72,10 +72,22 @@ define(function(require) {
         
         return finalOption;
     }
+
+    /**
+     * 获取数据值
+     * @param {Object|number} dataItem
+     * @param {} [defaultVal]
+     */
+    function queryValue(dataItem, defaultVal) {
+        return dataItem != null
+            ? (dataItem.value != null ? dataItem.value : dataItem)
+            : defaultVal;
+    }
     
     return {
-        query : query,
-        deepQuery : deepQuery,
-        deepMerge : deepMerge
+        query: query,
+        deepQuery: deepQuery,
+        deepMerge: deepMerge,
+        queryValue: queryValue
     };
 });
