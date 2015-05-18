@@ -7,15 +7,11 @@
 
 define(function (require) {
 
-    var arraySlice = Array.prototype.slice;
-
     /**
      * @alias module:echarts/coord/scale/Ordinal
      * @param {Array} list
      */
     var OrdinalScale = function (list) {
-
-        this._list = list;
 
         /**
          * Extent of ordianl is the extent of rank
@@ -45,10 +41,20 @@ define(function (require) {
         },
 
         /**
+         * Scale normalized value
+         * @param {number} val
+         * @return {number}
+         */
+        scale: function (val) {
+            var extent = this._extent;
+            return Math.round(val * (extent[1] - extent[0]) + extent[0]);
+        },
+
+        /**
          * Set extent from data
          */
         setExtentFromData: function (list) {
-            this._extent = [1, list.length];
+            this._extent = [0, list.length - 1];
         },
 
         /**
@@ -56,7 +62,7 @@ define(function (require) {
          * @return {Array.<number>}
          */
         getExtent: function () {
-            return arraySlice.call(this._extent);
+            return this._extent.slice();
         },
 
         /**
@@ -66,8 +72,8 @@ define(function (require) {
          */
         setExtent: function (start, end) {
             var thisExtent = this._extent;
-            thisExtent[0] = Math.max(start, 0);
-            thisExtent[1] = Math.min(end, this._list.length - 1);
+            thisExtent[0] = start;
+            thisExtent[1] = end;
         },
 
         /**
@@ -79,11 +85,16 @@ define(function (require) {
             var rank = extent[0];
 
             while (rank <= extent[1]) {
-                ticks.push(this._list[rank - 1]);
+                ticks.push(rank);
+                rank++;
             }
 
             return ticks;
-        }
+        },
+        
+        // Do nothing
+        niceTicks: function () {},
+        niceExtent: function () {},
     };
 
     return OrdinalScale;

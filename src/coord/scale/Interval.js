@@ -7,8 +7,8 @@
 
 define(function (require) {
 
-    var arraySlice = Array.prototype.slice;
-
+    var mathFloor = Math.floor;
+    var mathCeil = Math.ceil;
     /**
      * @alias module:echarts/coord/scale/Interval
      * @param {Array.<number>} data
@@ -42,12 +42,23 @@ define(function (require) {
         type: 'interval',
 
         /**
-         * Normalize given value to linear [0, 1]
-         * @return {number} val
+         * Normalize value to linear [0, 1]
+         * @param {number} val
+         * @return {number}
          */
         normalize: function (val) {
             var extent = this._extent;
             return (val - extent[0]) / (extent[1] - extent[0]);
+        },
+        
+        /**
+         * Scale normalized value
+         * @param {number} val
+         * @return {number}
+         */
+        scale: function (val) {
+            var extent = this._extent;
+            return val * (extent[1] - extent[0]) + extent[0];
         },
 
         /**
@@ -69,7 +80,7 @@ define(function (require) {
          * @return {Array.<number>}
          */
         getExtent: function () {
-            return arraySlice.call(this._extent);
+            return this._extent.slice();
         },
 
         /**
@@ -79,8 +90,8 @@ define(function (require) {
          */
         setExtent: function (start, end) {
             var thisExtent = this._extent;
-            thisExtent[0] = start;
-            thisExtent[1] = end;
+            thisExtent[0] = isNaN(start) ? 0 : start;
+            thisExtent[1] = isNaN(end) ? 0 : end;
         },
 
         /**
@@ -108,17 +119,20 @@ define(function (require) {
             var interval = this.getInterval();
             var extent = this._extent;
             var ticks = [];
-            var niceExtent = this._niceExtent;
-            if (extent[0] < niceExtent[0]) {
-                ticks.push(extent[0]);
-            }
-            var tick = niceExtent[0];
-            while (tick <= niceExtent[1]) {
-                ticks.push(tick);
-                tick += interval;
-            }
-            if (extent[1] > niceExtent[1]) {
-                ticks.push(extent[1]);
+            
+            if (interval) {
+                var niceExtent = this._niceExtent;
+                if (extent[0] < niceExtent[0]) {
+                    ticks.push(extent[0]);
+                }
+                var tick = niceExtent[0];
+                while (tick <= niceExtent[1]) {
+                    ticks.push(tick);
+                    tick += interval;
+                }
+                if (extent[1] > niceExtent[1]) {
+                    ticks.push(extent[1]);
+                }
             }
 
             return ticks;
@@ -149,8 +163,8 @@ define(function (require) {
             }
 
             var niceExtent = [];
-            niceExtent[0] = Math.ceil(extent[0] / interval) * interval;
-            niceExtent[1] = Math.floor(extent[1] / interval) * interval;
+            niceExtent[0] = mathCeil(extent[0] / interval) * interval;
+            niceExtent[1] = mathFloor(extent[1] / interval) * interval;
 
             this._interval = interval;
             this._niceExtent = niceExtent;
@@ -160,11 +174,14 @@ define(function (require) {
          * Nice extent.
          */
         niceExtent: function () {
-            var niceExtent = this._niceExtent;
-            if (! niceExtent) {
+            if (! this._niceExtent) {
                 this.niceTicks();
             }
-            this.setExtent(niceExtent[0], niceExtent[1]);
+            var extent = this._extent;
+            var interval = this._interval;
+            
+            extent[0] = mathFloor(extent[0] / interval) * interval;
+            extent[1] = mathCeil(extent[1] / interval) * interval;
         }
     };
 

@@ -701,16 +701,18 @@ define(function (require) {
                         component.refresh && component.refresh(magicOption);
                     }
                     else {
-                        ComponentClass = componentLibrary.get(
-                            /^[xy]Axis$/.test(componentType) ? 'axis' : componentType
-                        );
-                        component = new ComponentClass(
-                            this._themeConfig, this._messageCenter, this._zr,
-                            magicOption, this, componentType
-                        );
-                        this.component[componentType] = component;
+                        ComponentClass = componentLibrary.get(componentType);
+                        if (ComponentClass) {
+                            component = new ComponentClass(
+                                this._themeConfig, this._messageCenter, this._zr,
+                                magicOption, this
+                            );
+                            this.component[componentType] = component;   
+                        }
                     }
-                    this._chartList.push(component);
+                    if (component) {
+                        this._chartList.push(component);   
+                    }
                 }
                 else if (component) {
                     component.dispose();
@@ -761,8 +763,6 @@ define(function (require) {
                     delete this.chart[chartType];
                 }
             }
-            
-            this.component.grid && this.component.grid.refixAxisShape(this.component);
 
             this._island.refresh(magicOption);
             this._toolbox.refresh(magicOption);
@@ -843,7 +843,6 @@ define(function (require) {
             for (var i = 0, l = this._chartList.length; i < l; i++) {
                 this._chartList[i].refresh && this._chartList[i].refresh(magicOption);
             }
-            this.component.grid && this.component.grid.refixAxisShape(this.component);
             this._zr.refresh();
         },
 

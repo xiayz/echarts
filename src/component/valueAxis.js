@@ -367,7 +367,7 @@ define(function (require) {
             var color = this.option.splitArea.areaStyle.color;
 
             if (!(color instanceof Array)) {
-                // 非数组一律认为是单一颜色的字符串，单一颜色则用一个背景，颜色错误不负责啊！！！
+                // 非数组一律认为是单一颜色的字符串，单一颜色则用一个背景
                 axShape = {
                     zlevel: this.getZlevelBase(),
                     z: this.getZBase(),

@@ -1,9 +1,12 @@
 /**
  * echarts组件： 网格
- *
- * @desc echarts基于Canvas，纯Javascript图表库，提供直观，生动，可交互，可个性化定制的数据统计图表。
+ * 
+ * @module echarts/component/grid
+ * 
  * @author Kener (@Kener-林峰, kener.linfeng@gmail.com)
- *
+ *         Yi Shen(http://github.com/pissang)
+ * TODO
+ *  - eventRiver
  */
 define(function (require) {
 
@@ -14,6 +17,7 @@ define(function (require) {
     var Cartesian = require('../coord/Cartesian');
     var IntervalScale = require('../coord/scale/Interval');
     var OrdinalScale = require('../coord/scale/Ordinal');
+    var Axis = Cartesian.Axis;
 
     // 图形依赖
     var RectangleShape = require('zrender/shape/Rectangle');
@@ -41,25 +45,70 @@ define(function (require) {
     };
 
     var zrUtil = require('zrender/tool/util');
+    	
+    /**
+     * Extend axis 2d
+     * @constructor
+     * @extends {module:echarts/coord/Cartesian.Axis}
+     * @param {string} name
+     * @param {} scale
+     * @param {Array.<number>} coordExtent
+     * @param {string} axisType
+     * @param {string} position
+     * @param {number} otherCoord
+     */
+    var Axis2D = function (name, scale, coordExtent, axisType, position, otherCoord) {
+        Axis.call(this, name, scale, coordExtent);
+        /**
+         * Axis type
+         *  - 'category'
+         *  - 'value'
+         *  - 'time'
+         *  - 'log'
+         * @type {string}
+         */
+        this.type = axisType || 'value';
+        
+        /**
+         * Axis position
+         *  - 'top'
+         *  - 'bottom'
+         *  - 'left'
+         *  - 'right' 
+         */
+        this.position = position || 'bottom';
+        
+        /**
+         * Coord on the other axis
+         */
+        this.otherCoord = otherCoord || 0;
+    };
+    
+    Axis2D.prototype = {
+        
+        constructor: Axis2D,
+        
+        isHorizontal: function() {
+            var position = this.position;
+            return position === 'top' || position === 'bottom';
+        }
+    };
+    
+    zrUtil.inherits(Axis2D, Axis);
 
     /**
-     * 构造函数
-     * @param {Object} messageCenter echart消息中心
-     * @param {ZRender} zr zrender实例
-     * @param {Object} option 图表选项
-     *      @param {number=} option.grid.x 直角坐标系内绘图网格起始横坐标，数值单位px
-     *      @param {number=} option.grid.y 直角坐标系内绘图网格起始纵坐标，数值单位px
-     *      @param {number=} option.grid.width 直角坐标系内绘图网格宽度，数值单位px
-     *      @param {number=} option.grid.height 直角坐标系内绘图网格高度，数值单位px
+     * @constructor
+     * @alias module:echarts/component/grid
+     * @extends {module:echarts/component/base}
      */
     function Grid(ecTheme, messageCenter, zr, option, myChart) {
         Base.call(this, ecTheme, messageCenter, zr, option, myChart);
 
-        this.refresh(option);
-
         this._coords = {};
 
         this._axes = {};
+
+        this.refresh(option);
     }
     
     Grid.prototype = {
@@ -100,8 +149,8 @@ define(function (require) {
         
         getBbox: function() {
             return [
-                [ this._x, this._y ],
-                [ this.getXend(), this.getYend() ]
+                [this._x, this._y],
+                [this.getXend(), this.getYend()]
             ];
         },
 
@@ -145,7 +194,7 @@ define(function (require) {
                 this._x = this.subPixelOptimize(this._x, gridOption.borderWidth);
                 this._y = this.subPixelOptimize(this._y, gridOption.borderWidth);
     
-                this.shapeList.push(new RectangleShape({
+                var rect = new RectangleShape({
                     zlevel: this.getZlevelBase(),
                     z: this.getZBase(),
                     hoverable: false,
@@ -158,10 +207,11 @@ define(function (require) {
                         color: gridOption.backgroundColor,
                         strokeColor: gridOption.borderColor,
                         lineWidth: gridOption.borderWidth
-                        // type: this.option.splitArea.areaStyle.type,
                     }
-                }));
-                this.zr.addShape(this.shapeList[0]);
+                });
+                this.zr.addShape(rect);
+                
+                this.shapeList.push(rect);
             }
 
             this._initCartesian(this.option);
@@ -187,6 +237,56 @@ define(function (require) {
         getAxis: function (name, index) {
             return this._axes[name + index];
         },
+        
+        /**
+         * Convert series data to coorindates 
+         * @param {Array} data
+         * @param {number} [xAxisIndex=0]
+         * @param {number} [yAxisIndex=0]
+         * @return {Array}
+         *  Return list of coordinates. For example:
+         *  `[[10, 10], [20, 20], [30, 30]]`
+         */
+        dataToCoords: function (data, xAxisIndex, yAxisIndex) {
+            xAxisIndex = xAxisIndex || 0;
+            yAxisIndex = yAxisIndex || 0;
+
+            var cartesian = this.getCartesian(xAxisIndex, yAxisIndex);
+            var categoryAxis = cartesian.getAxesByScale('ordinal')[0];
+            var coordGetter;
+            if (categoryAxis) {
+                // Another value axis
+                var otherAxisName = categoryAxis.name === 'x' ? 'y' : 'x';
+                var otherAxis = cartesian.getAxis(otherAxisName);
+
+    	        var anotherCoordIndex = otherAxis.isHorizontal() ? 0 : 1; 
+
+                coordGetter = function (dataItem, dataIndex) {
+                    var coord = [];
+                    var value = queryValue(dataItem, 0);
+                    coord[1 - anotherCoordIndex] = categoryAxis.dataToCoord(dataIndex);
+                    coord[anotherCoordIndex] = otherAxis.dataToCoord(value);
+
+                    return coord;
+                };
+            }
+            else {  	// Both axes are type value
+                var axisX = cartesian.getAxis('x');
+                var axisY = cartesian.getAxis('y');
+                
+                var axisXCoordIndex = axisX.isHorizontal() ? 0 : 1; 
+
+                coordGetter = function (dataItem, dataIndex) {
+                    var coord = [];
+                    var value = queryValue(dataItem, 0);
+                    coord[axisXCoordIndex] = axisX.dataToCoord(value[0]); 
+                    coord[1 - axisXCoordIndex] = axisY.dataToCoord(value[0]);
+                    return coord;
+                };
+            }
+
+            return zrUtil.map(data, coordGetter);
+        },
 
         /**
          * Initialize cartesian coordinate systems
@@ -207,12 +307,16 @@ define(function (require) {
                 yAxesList = [yAxesList];
             }
 
-            var getScaleByOption = function (axisOption) {
-                switch (axisOption.type) {
-                    case 'value':
-                        return new IntervalScale();
-                    case 'category':
-                        return new OrdinalScale(axisOption.data);
+            var getScaleByOption = function (axisType, axisOption) {
+                if (axisOption.type) {
+                    return axisOption.type === 'value'
+                        ? new IntervalScale()
+                        : new OrdinalScale(axisOption.data);
+                }
+                else {
+                    return axisType === 'y'
+                        ? new IntervalScale()
+                        : new OrdinalScale(axisOption.data);
                 }
             }
 
@@ -243,11 +347,13 @@ define(function (require) {
 
                 switch (position) {
                     case 'top':
+                        return [gridX, gridX + gridWidth, gridY, position];
                     case 'bottom':
-                        return [gridX, gridX + gridWidth, position];
+                        return [gridX, gridX + gridWidth, gridY + gridHeight, position];
                     case 'left':
+                        return [gridY, gridY + gridHeight, gridX, position];
                     case 'right':
-                        return [gridY, gridY + gridHeight, position];
+                        return [gridY, gridY + gridHeight, gridX + gridWidth, position];
                 }
             }
 
@@ -258,7 +364,8 @@ define(function (require) {
             var key;
             var cartesian;
             var coordExtent;
-            var axis;
+            var axisX;
+            var axisY;
             for (i = 0; i < xAxesList.length; i++) {
                 xAxisOpt = xAxesList[i];
                 for (j = 0; j < yAxesList.length; j++) {
@@ -269,27 +376,54 @@ define(function (require) {
 
                     // Create x axis
                     coordExtent = getCoordExtent('x', xAxisOpt);
-                    axis = cartesian.createAxis(
-                        'x', getScaleByOption(xAxisOpt), coordExtent.slice(0, 2)
+                    axisX = new Axis2D(
+                        'x', getScaleByOption(xAxisOpt.type, xAxisOpt),
+                        coordExtent.slice(0, 2),
+                        xAxisOpt.type,
+                        coordExtent[3],
+                        coordExtent[2]
                     );
-                    axis.position = coordExtent[2];
-                    axis.type = xAxisOpt.type || 'value';
-                    this._axes['x' + i] = axis;
+                    cartesian.addAxis(axisX);
+                    this._axes['x' + i] = axisX;
 
                     // Create y axis
-                    coordExtent = getCoordExtent('x', xAxisOpt);
-                    axis = cartesian.createAxis(
-                        'y', getScaleByOption(yAxisOpt), coordExtent.slice(0, 2)
+                    coordExtent = getCoordExtent('y', yAxisOpt);
+                    axisY = new Axis2D(
+                        'y', getScaleByOption(yAxisOpt.type, yAxisOpt),
+                        coordExtent.slice(0, 2),
+                        yAxisOpt.type,
+                        coordExtent[3],
+                        coordExtent[2]
                     );
-                    axis.position = coordExtent[2];
-                    axis.type = yAxisOpt.type || 'value';
-                    this._axes['y' + i] = axis;
+                    cartesian.addAxis(axisY);
+                    this._axes['y' + i] = axisY;
+                    
+                    // Adjust axis direction
+                    var horizontalAxis;
+                    var verticalAxis;
+                    if (axisX.isHorizontal()) {
+                        horizontalAxis = axisX;
+                        verticalAxis = axisY;
+                    }
+                    else {
+                        horizontalAxis = axisY;
+                        verticalAxis = axisX;    
+                    }
+                    if (horizontalAxis.position === 'bottom') {
+                        // Reverse vertical axis to bottom-up direction
+                        verticalAxis.reverse();
+                    }
+                    if (verticalAxis.position === 'right') {
+                        // Reverse horizontal axis to right-left direction
+                        horizontalAxis.reverse();
+                    }
                 }
             }
 
             // Data
-            // PENDING Inject data in the chart instance ?
+            // TODO Event River
             var stackDataMap = {};
+            var coordDataMap = {};
             zrUtil.each(option.series, function (series, idx) {
                 var chartType = series.type;
                 var defaultCfg = ecConfig[chartType];
@@ -303,15 +437,15 @@ define(function (require) {
                     var cartesian = this.getCartesian(xAxisIndex, yAxisIndex);
 
                     cartesian.series.push(series);
-
-                    var stackKey = chartType + cartesian.name + (series.stack || '');
-
+    	            
+                    var coordKey = chartType + cartesian.name;
+                    var stackKey = coordKey + series.stack;
+                    // Accumulated data for stack charts
                     var stackData = stackDataMap[stackKey];
+                    // Data of one particular coordinate system
+                    var coordData = coordDataMap[coordKey];
                     if (! stackData) {
                         stackData = stackDataMap[stackKey] = {
-
-                            cartesian: cartesian,
-
                             // Positive stack
                             px: [],
                             py: [],
@@ -320,62 +454,56 @@ define(function (require) {
                             ny: []
                         };
                     }
+                    if (! coordData) {
+                        coordData = coordDataMap[coordKey] = {
+                            cartesian: cartesian,
+                            x: [],
+                            y: []
+                        };
+                    }
+                    
 
                     var data = series.data;
                     if (! (data && data.length)) {
                         return;
                     }
                     // TODO
-                    var categoryAxis = cartesian.getAxesByScaleType('ordinal');
+                    var categoryAxis = cartesian.getAxesByScale('ordinal');
                     categoryAxis = categoryAxis[0];
                     var valueAxisName;
                     if (categoryAxis) {
-                        valueAxisName = categoryAxis.name === 'x' ? 'y' : 'x'
+                        valueAxisName = categoryAxis.name === 'x' ? 'y' : 'x';
                     }
 
                     for (var i = 0; i < data.length; i++) {
-                        var value = queryValue(data[i]);
-                        if (value) {
-                            // 双数值轴没有 stack
-                            if (! categoryAxis) {
-                                stackData.x.push(+value[0]);
-                                stackData.y.push(+value[1]);
+                        var value = queryValue(data[i], '-');
+                        if (value !== '-') {
+                            // 双数值轴不支持 stack
+                            if (series.stack && ! categoryAxis) {
+                                // Stack
+                                var pKey = 'p' + valueAxisName;
+                                var nKey = 'n' + valueAxisName;
+                                var key = value >= 0 ? pKey : nKey;
+                                stackData[pKey][i] = stackData[pKey][i] || 0;
+                                stackData[nKey][i] = stackData[nKey][i] || 0;
+                                stackData[key][i] += value;
+
+                                coordData[valueAxisName].push(stackData[key][i]);
+                            }
+                            else if (categoryAxis) {
+                                coordData[valueAxisName].push(+value);
                             }
                             else {
-                                // Stack
-                                var key = (value >= 0 ? 'p' : 'n') + valueAxisName;
-                                stackData[key][i] = stackData[key][i] || 0;
-                                stackData[key][i] += value;
+                                // 双数值轴
+                                coordData.x.push(+value[0]);
+                                coordData.y.push(+value[1]);
                             }
                         }
                     }
                 }
             }, this);
-        
-            // Data grouped by cartesian
-            var dataMap = {};
-            zrUtil.each(stackDataMap, function (stackData) {
-                var xData = stackData.px.concat(stackData.nx);
-                var yData = stackData.py.concat(stackData.ny);
 
-                var name = stackData.cartesian.name;
-                var i;
-
-                dataMap[name] = dataMap[name] || {
-                    x: [],
-                    y: [],
-                    cartesian: cartesian
-                };
-
-                for (i = 0; i < xData.length; i++) {
-                    dataMap[name].x.push(xData[i]);
-                }
-                for (i = 0; i < yData.length; i++) {
-                    dataMap[name].y.push(yData[i]);
-                }
-            });
-
-            zrUtil.each(dataMap, function (item) {
+            zrUtil.each(coordDataMap, function (item) {
                 var cartesian = item.cartesian;
                 if (item.x.length) {
                     cartesian.getAxis('x').scale.setExtentFromData(item.x);

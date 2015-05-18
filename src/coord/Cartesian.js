@@ -7,7 +7,7 @@ define(function (require) {
 
     'use strict';
 
-    var number = require('../core/number');
+    var linearMap = require('../core/number').linearMap;
     var util = require('zrender/tool/util');
 
     /**
@@ -27,16 +27,6 @@ define(function (require) {
          * @type {module:echarts/coord/scale/*}
          */
         this.scale = scale;
-        
-        /**
-         * Axis type
-         *  - 'category'
-         *  - 'value'
-         *  - 'time'
-         *  - 'log'
-         * @type {string}
-         */
-        this.type = 'value';
 
         this._coordExtent = coordExtent;
     };
@@ -44,6 +34,13 @@ define(function (require) {
     Axis.prototype = {
 
         constructor: Axis,
+        
+        /**
+         * Reverse axis direction
+         */
+        reverse: function () {
+            this._coordExtent = this._coordExtent.reverse();
+        },
 
         /**
          * Get coord extent
@@ -70,10 +67,9 @@ define(function (require) {
          * @return {number}
          */
         dataToCoord: function (data, clamp) {
-            var coordExtent = this._coordExtent;
             data = this.scale.normalize(data);
 
-            return number.linearMap(data, [0, 1], coordExtent, clamp);
+            return linearMap(data, [0, 1], this._coordExtent, clamp);
         },
 
         /**
@@ -82,17 +78,18 @@ define(function (require) {
          * @return {number}
          */
         coordToData: function (coord, clamp) {
-            var coordExtent = this._coordExtent;
-            data = this.scale.normalize(data);
+            var t = linearMap(coord, this._coordExtent, [0, 1], clamp);
 
-            return number.linearMap(coord, [0, 1], dataExtent, clamp);
+            return this.scale.scale(t);
         },
         /**
          * @return {ticks}
          */
         getTicksCoords: function () {
             var ticks = this.scale.getTicks();
-            return util.map(ticks, this.coordToData, this);
+            return util.map(ticks, function (data) {
+                return this.dataToCoord(data);
+            }, this);
         }
     };
 
@@ -138,33 +135,45 @@ define(function (require) {
          * @return {Array.<module:echarts/coord/Cartesian~Axis>}
          */
         getAxes: function () {
-            return util.map(this._axisKeyList, axisNameMapper, this);
+            return util.map(this._axisKeyList, keyAxisMapper, this);
         },
 
         /**
          * Get axes list by given scale type
          */
-        getAxesByScaleType: function (type) {
-            type = type.toLowerCase();
+        getAxesByScale: function (scaleType) {
+            scaleType = scaleType.toLowerCase();
             return util.filter(
                 this.getAxes(),
                 function (axis) {
-                    return axis.type === type;
+                    return axis.scale.type === scaleType;
                 }
             );
         },
 
         /**
-         * Add an axis
+         * Create a basic axis
          * @param {number|string} key
+         * @return {module:echarts/coord/Cartesian.Axis}
          */
         createAxis: function (key, scale, coordExtent) {
             var axis = new Axis(key, scale, coordExtent);
-            this._axis[key] = axis;
-
-            this._axisKeyList.push(axis);
+            
+            this.addAxis(axis);
 
             return axis;
+        },
+        
+        /**
+         * Add axis
+         * @param {module:echarts/coord/Cartesian.Axis}
+         */
+        addAxis: function (axis) {
+            var key = axis.name;
+
+            this._axis[key] = axis;
+
+            this._axisKeyList.push(key);
         },
 
         /**

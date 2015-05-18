@@ -1,5 +1,5 @@
 /**
- * echarts组件类： 坐标轴
+ * Axis component provide xAxis and yAxis draw
  *
  * @desc echarts基于Canvas，纯Javascript图表库，提供直观，生动，可交互，可个性化定制的数据统计图表。
  * @author Kener (@Kener-林峰, kener.linfeng@gmail.com)
@@ -14,9 +14,15 @@
  *    纵轴通常为数值型，但条形图时则纵轴为类目型。
  * 
  * TODO 
- * * Time formattter
- * * Label rotation
- *
+ * - Time formattter
+ * - Label rotation
+ * - Label clickable and hightlight color
+ * - Category interval
+ * - boundaryGap
+ * - min, max, splitNumber
+ * - onZero
+ * 
+ * - axisLine add halfLineWidth offset ?
  */
 define(function (require) {
     var Base = require('./base');
@@ -33,10 +39,127 @@ define(function (require) {
     var zrColor = require('zrender/tool/color');
 
     var component = require('../component');
-
-    function isHorizontal (position) {
-        return position === 'top' || position === 'bottom';
-    }
+    
+    var round = Math.round;
+    /**************************************
+     * 坐标轴配置项，分为数值型和类目型
+     **************************************/
+    // 数值型坐标轴默认参数
+    ecConfig.valueAxis = {
+        zlevel: 0,                  // 一级层叠
+        z: 0,                       // 二级层叠
+        show: true,
+        position: 'left',      // 位置
+        name: '',              // 坐标轴名字，默认为空
+        nameLocation: 'end',   // 坐标轴名字位置，支持'start' | 'end'
+        nameTextStyle: {},     // 坐标轴文字样式，默认取全局样式
+        boundaryGap: [0, 0],   // 数值起始和结束两端空白策略
+        // min: null,          // 最小值
+        // max: null,          // 最大值
+        // scale: false,       // 脱离0值比例，放大聚焦到最终_min，_max区间
+        // splitNumber: 5,        // 分割段数，默认为5
+        axisLine: {            // 坐标轴线
+            show: true,        // 默认显示，属性show控制显示与否
+            onZero: true,
+            lineStyle: {       // 属性lineStyle控制线条样式
+                color: '#48b',
+                width: 2,
+                type: 'solid'
+            }
+        },
+        axisTick: {            // 坐标轴小标记
+            show: true,       // 属性show控制显示与否，默认显示
+            inside: false,     // 控制小标记是否在grid里
+            length :5,         // 属性length控制线长
+            lineStyle: {       // 属性lineStyle控制线条样式
+                color: '#333',
+                width: 1
+            }
+        },
+        axisLabel: {           // 坐标轴文本标签，详见axis.axisLabel
+            show: true,
+            rotate: 0,
+            margin: 8,
+            // clickable: false,
+            // formatter: null,
+            textStyle: {       // 其余属性默认使用全局文本样式，详见TEXTSTYLE
+                color: '#333'
+            }
+        },
+        splitLine: {           // 分隔线
+            show: true,        // 默认显示，属性show控制显示与否
+            lineStyle: {       // 属性lineStyle（详见lineStyle）控制线条样式
+                color: ['#ccc'],
+                width: 1,
+                type: 'solid'
+            }
+        },
+        splitArea: {           // 分隔区域
+            show: false,       // 默认不显示，属性show控制显示与否
+            areaStyle: {       // 属性areaStyle（详见areaStyle）控制区域样式
+                color: ['rgba(250,250,250,0.3)','rgba(200,200,200,0.3)']
+            }
+        }
+    };
+    
+    // 类目轴
+    ecConfig.categoryAxis =  {
+        zlevel: 0,                  // 一级层叠
+        z: 0,                       // 二级层叠
+        show: true,
+        position: 'bottom',    // 位置
+        name: '',              // 坐标轴名字，默认为空
+        nameLocation: 'end',   // 坐标轴名字位置，支持'start' | 'end'
+        nameTextStyle: {},     // 坐标轴文字样式，默认取全局样式
+        boundaryGap: true,     // 类目起始和结束两端空白策略
+        axisLine: {            // 坐标轴线
+            show: true,        // 默认显示，属性show控制显示与否
+            onZero: true,
+            lineStyle: {       // 属性lineStyle控制线条样式
+                color: '#48b',
+                width: 2,
+                type: 'solid'
+            }
+        },
+        axisTick: {            // 坐标轴小标记
+            show: true,        // 属性show控制显示与否，默认不显示
+            interval: 'auto',
+            inside: false,    // 控制小标记是否在grid里 
+            // onGap: null,
+            length :5,         // 属性length控制线长
+            lineStyle: {       // 属性lineStyle控制线条样式
+                color: '#333',
+                width: 1
+            }
+        },
+        axisLabel: {           // 坐标轴文本标签，详见axis.axisLabel
+            show: true,
+            interval: 'auto',
+            rotate: 0,
+            margin: 8,
+            // clickable: false,
+            // formatter: null,
+            textStyle: {       // 其余属性默认使用全局文本样式，详见TEXTSTYLE
+                color: '#333'
+            }
+        },
+        splitLine: {           // 分隔线
+            show: true,        // 默认显示，属性show控制显示与否
+            // onGap: null,
+            lineStyle: {       // 属性lineStyle（详见lineStyle）控制线条样式
+                color: ['#ccc'],
+                width: 1,
+                type: 'solid'
+            }
+        },
+        splitArea: {           // 分隔区域
+            show: false,       // 默认不显示，属性show控制显示与否
+            // onGap: null,
+            areaStyle: {       // 属性areaStyle（详见areaStyle）控制区域样式
+                color: ['rgba(250,250,250,0.3)','rgba(200,200,200,0.3)']
+            }
+        }
+    };
 
     /**
      * 构造函数
@@ -54,24 +177,40 @@ define(function (require) {
     }
 
     Axis.prototype = {
+
         type: ecConfig.COMPONENT_TYPE_AXIS,
 
-        refresh: function (newOption) {
-
-            if (newOption) {
-                this.option = this.reformOption(newOption);
-            }
-            var option = this.option;
-
+        refresh: function (option) {
             var grid = this.component.grid;
 
             var axisType = this.type;
             var axisTypeShort = axisType.slice(0, 1);
             var axesOption = option[axisType];
 
+            if (! (axesOption instanceof Array)) {
+                axesOption = [axesOption];
+            }
+
             for (var i = 0; i < axesOption.length; i++) {
+                var axisOption = axesOption[i];
+                // Reform option
+                if (! axisOption.type) {
+                    // Default x is category axis and y is value axis
+                    axisOption.type = axisTypeShort === 'x'
+                        ? 'category' : 'value';
+                }
+                var key = axisOption.type + 'Axis';
+                axesOption[i] = zrUtil.merge(
+                    zrUtil.merge(
+                        axisOption,
+                        this.ecTheme[key] || {}
+                    ),
+                    ecConfig[key]
+                );
+
                 var axis = grid.getAxis(axisTypeShort, i);
-                this._buildShape(axis, axesOption[i]);
+                axis.scale.niceExtent();
+                this._buildShape(axis, axisOption);
             }
         },
 
@@ -80,7 +219,7 @@ define(function (require) {
             option.axisLine.show && this._buildAxisLine(axis, option);
             option.axisTick.show && this._buildAxisTick(axis, option);
             option.axisLabel.show && this._buildAxisLabel(axis, option);
-            
+
             this._buildSplitLineArea(axis, option);
 
             var shapeList = this.shapeList;
@@ -93,7 +232,6 @@ define(function (require) {
         _buildAxisLine: function (axis, option) {
             var lineStyleOption = option.axisLine.lineStyle;
             var lineWidth = lineStyleOption.width;
-            var halfLineWidth = lineWidth / 2;
             var grid = this.component.grid;
 
             var axShape = new LineShape({
@@ -119,56 +257,36 @@ define(function (require) {
             var x1 = grid.getXend();
             var y1 = grid.getYend();
 
-            var zeroCoord = axis.dataToCoord(0, true);
-            var onZero = option.axisLine.onZero;
-
             // Sub pixel optimize
-            var offset = (1 - lineWidth % 2) / 2;
-            halfLineWidth += offset;
+            var offset = (round(lineWidth) % 2) / 2;
             switch (axis.position) {
                 case 'left':
-                    if (onZero) {
-                        xStart = xEnd = zeroCoord;
-                    }
-                    else {
-                        xStart = xEnd = x0 - halfLineWidth;   
-                    }
+                    xStart = xEnd = x0 + offset;
                     yStart = y1;
                     yEnd = y0;
                     break;
                 case 'right':
-                    if (onZero) {
-                        xStart = xEnd = zeroCoord;
-                    }
-                    else {
-                        xStart = xEnd = x1 + halfLineWidth;
-                    }
+                    xStart = xEnd = x1 + offset;
                     yStart = y1;
                     yEnd = y0;
                     break;
                 case 'bottom':
                     xStart = x0;
                     xEnd = x1;
-                    if (onZero) {
-                        yStart = yEnd = zeroCoord;
-                    }
-                    else {
-                        yStart = yEnd = y1 + halfLineWidth;
-                    }
+                    yStart = yEnd = y1 + offset;
                     break;
                 case 'top':
                     xStart = x0;
                     xEnd = x1;
-                    if (onZero) {
-                        yStart = yEnd = zeroCoord;
-                    }
-                    else {
-                        yStart = yEnd = y1 - halfLineWidth;
-                    }
+                    yStart = yEnd = y0 + offset;
                     break;
             }
             var style = axShape.style;
             var nameTextStyleOption = option.nameTextStyle;
+            style.xStart = xStart;
+            style.yStart = yStart;
+            style.xEnd = xEnd;
+            style.yEnd = yEnd;
             if (option.name !== '') { // 别帮我代码规范
                 style.text = option.name;
                 style.textPosition = option.nameLocation;
@@ -194,43 +312,36 @@ define(function (require) {
             var tickLen = tickOption.length;
             var tickColor = lineStyleOption.color;
             var tickLineWidth = lineStyleOption.width;
-            var grid = this.component.grid;
-
-            var x0 = grid.getX();
-            var y0 = grid.getY();
 
             // Sub pixel optimize
-            var offset = (1 - tickLineWidth % 2) / 2;
-
-            var offX = 0;
-            var offY = 0;
-
-            var stepX = 0;
-            var stepY = 0;
+            var offset = round(tickLineWidth) % 2 / 2;
 
             var axisPosition = axis.position;
-
-            if (isHorizontal(axisPosition)) {
-                offY = axisPosition === 'top' ? -tickLen : tickLen;
-                stepX = 1;
-            }
-            else {
-                offX = axisPosition === 'left' ? -tickLen : tickLen;
-                stepY = 1;
-            }
-            if (tickOption.inside) {
-                offX = -offX;
-                offY = -offY;
-            }
 
             var ticksCoords = axis.getTicksCoords();
 
             for (var i = 0; i < ticksCoords.length; i++) {
                 var tickCoord = ticksCoords[i] + offset;
 
-                var x = x0 + tickCoord * stepX;
-                var y = y0 + tickCoord * stepY;
+                var x;
+                var y;
+                var offX = 0;
+                var offY = 0;
 
+                if (axis.isHorizontal()) {
+                    x = tickCoord;
+                    y = axis.otherCoord;
+                    offY = axisPosition === 'top' ? -tickLen : tickLen;
+                }
+                else {
+                    x = axis.otherCoord;
+                    y = tickCoord;
+                    offX = axisPosition === 'left' ? -tickLen : tickLen;
+                }
+                if (tickOption.inside) {
+                    offX = -offX;
+                    offY = -offY;
+                }
                 // Tick line
                 var shape = new LineShape({
                     zlevel: this.getZlevelBase(),
@@ -251,45 +362,13 @@ define(function (require) {
         },
 
         _buildAxisLabel: function (axis, option) {
-            var grid = this.component.grid;
-            
             var labelOption = option.axisLabel;
             var labelMargin = labelOption.margin;
             var textStyle = labelOption.textStyle;
 
-            var labelMarginX = 0;
-            var labelMarginY = 0;
-            var labelTextAlign = 'center';
-            var labelTextBaseline = 'middle';
             var labelRotate = labelOption.rotate;
 
-            var stepX = 0;
-            var stepY = 0;
-
             var axisPosition = axis.position;
-
-            if (isHorizontal(axisPosition)) {
-                stepX = 1;
-                if (axisPosition === 'top') {
-                    labelMarginY = -labelMargin;
-                    labelTextBaseline = 'bottom';
-                }
-                else {
-                    labelMarginY = labelMargin;
-                    labelTextBaseline = 'top';
-                }
-            }
-            else {
-                stepY = 1;
-                if (axisPosition === 'left') {
-                    labelMarginX = -labelMargin;
-                    labelTextAlign = 'right';
-                }
-                else {
-                    labelMarginX = labelMargin;
-                    labelTextAlign = 'left';
-                }
-            }
 
             var formatter = labelOption.formatter;
             if (! formatter) {
@@ -297,6 +376,10 @@ define(function (require) {
                 switch (option.type) {
                     // TODO
                     case 'log':
+                        break;
+                    case 'category':
+                        formatter = function (val) {return val;};
+                        break;
                     default:
                         formatter = this.numAddCommas;
                 }
@@ -304,31 +387,65 @@ define(function (require) {
             else if (typeof formatter === 'string') {
                 formatter = (function (tpl) {
                     return function (val) {
-                        return tpl.replace({'value}', val);
+                        return tpl.replace('{value}', val);
                     }
                 })(formatter);
             }
 
             var ticks = axis.scale.getTicks();
-            var x0 = grid.getX();
-            var y0 = grid.getY();
 
             for (var i = 0; i < ticks.length; i++) {
                 var tick = ticks[i];
                 var tickCoord = axis.dataToCoord(tick);
-
-                if (option.type === 'time') {
+    	       
+                var label = tick;
+                if (option.type === 'category') {
+                    label = option.data[tick];    
+                }
+                else if (option.type === 'time') {
                     // TODO
                 }
-                var text = formatter(tick);
+
+                var text = formatter(label);
+                
+                var labelMarginX = 0;
+                var labelMarginY = 0;
+                var labelTextAlign = 'center';
+                var labelTextBaseline = 'middle';
+                var x;
+                var y;
+                if (axis.isHorizontal()) {
+                    x = tickCoord;
+                    y = axis.otherCoord;
+                    if (axisPosition === 'top') {
+                        labelMarginY = -labelMargin;
+                        labelTextBaseline = 'bottom';
+                    }
+                    else {
+                        labelMarginY = labelMargin;
+                        labelTextBaseline = 'top';
+                    }
+                }
+                else {
+                    y = tickCoord;
+                    x = axis.otherCoord;
+                    if (axisPosition === 'left') {
+                        labelMarginX = -labelMargin;
+                        labelTextAlign = 'right';
+                    }
+                    else {
+                        labelMarginX = labelMargin;
+                        labelTextAlign = 'left';
+                    }
+                }
 
                 var shape = new TextShape({
                     zlevel: this.getZlevelBase(),
                     z: this.getZBase(),
                     hoverable: false,
                     style: {
-                        x: x0 + tickCoord * stepX + labelMarginX,
-                        y: y0 + tickCoord * stepY + labelMarginY,
+                        x: x + labelMarginX,
+                        y: y + labelMarginY,
 
                         text: text,
                         textFont: this.getFont(textStyle),
@@ -359,7 +476,7 @@ define(function (require) {
             var lineColorLen = lineColor.length;
             var areaColorLen = areaColor.length;
 
-            var offset = (1 - lineWidth % 2) / 2;
+            var offset = (1 - round(lineWidth) % 2) / 2;
 
             var x0 = grid.getX();
             var y0 = grid.getY();
@@ -371,15 +488,15 @@ define(function (require) {
             var zlevel = this.getZlevelBase();
             var z = this.getZBase();
 
-            var _isHorizontal = isHorizontal(axis.position);
+            var isHorizontal = axis.isHorizontal();
 
             var prevX = 0;
             var prevY = 0;
             for (var i = 0; i < ticksCoords.length; i++) {
 
                 var tickCoord = ticksCoords[i];
-                var x = x0 + tickCoord + offset;
-                var y = y0 + tickCoord + offset;
+                var x = tickCoord + offset;
+                var y = tickCoord + offset;
 
                 // Draw split line
                 if (splitLineOption.show) {
@@ -395,7 +512,7 @@ define(function (require) {
                     });
 
                     var shapeStyle = shape.style;
-                    if (_isHorizontal) {
+                    if (isHorizontal) {
                         shapeStyle.xStart = shapeStyle.xEnd = x;
                         shapeStyle.yStart = y0;
                         shapeStyle.yEnd = y1;
@@ -420,7 +537,7 @@ define(function (require) {
                         }
                     });
                     var shapeStyle = shape.style;
-                    if (_isHorizontal) {
+                    if (isHorizontal) {
                         shapeStyle.x = prevX;
                         shapeStyle.y = y0;
                         // Math.abs in case coords is decreasing.
@@ -439,24 +556,6 @@ define(function (require) {
                 prevX = x;
                 prevY = y;
             }
-        },
-
-        _axisLabelClickable: function(clickable, axShape) {
-            if (clickable) {
-                ecData.pack(
-                    axShape, undefined, -1, undefined, -1, axShape.style.text
-                );
-                axShape.hoverable = true;
-                axShape.clickable = true;
-                axShape.highlightStyle = {
-                    color: zrColor.lift(axShape.style.color, 1),
-                    brushType: 'fill'
-                };
-                return axShape;
-            }
-            else {
-                return axShape;
-            }
         }
     };
 
@@ -472,7 +571,7 @@ define(function (require) {
 
         type: ecConfig.COMPONENT_TYPE_X_AXIS
     };
-    zrUtil.inherits(XAxis, Base);
+    zrUtil.inherits(XAxis, Axis);
 
     // Y Axis
     var YAxis = function () {
@@ -482,9 +581,9 @@ define(function (require) {
         
         constructor: YAxis,
 
-        type: ecConfig.COMPONENT_TYPE_X_AXIS
+        type: ecConfig.COMPONENT_TYPE_Y_AXIS
     };
-    zrUtil.inherits(YAxis, Base);
+    zrUtil.inherits(YAxis, Axis);
 
     component.define('axis', Axis);
     component.define('xAxis', XAxis);
