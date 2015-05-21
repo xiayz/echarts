@@ -12,7 +12,7 @@ define(function (require) {
      * @param {Array} list
      */
     var OrdinalScale = function (list) {
-
+        this._list = [];
         /**
          * Extent of ordianl is the extent of rank
          * Default is 0...len(list)-1
@@ -54,6 +54,7 @@ define(function (require) {
          * Set extent from data
          */
         setExtentFromData: function (list) {
+            this._list = list;
             this._extent = [0, list.length - 1];
         },
 
@@ -90,6 +91,13 @@ define(function (require) {
             }
 
             return ticks;
+        },
+        
+        /**
+         * Get item on rank n
+         */
+        getItem: function (n) {
+            return this._list[n];
         },
         
         // Do nothing
