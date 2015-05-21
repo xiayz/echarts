@@ -8,6 +8,7 @@
  *  - Large mode
  *  - Symbol
  *  - Calcucalable
+ *  - Polygon animation
  */
 define(function (require) {
     var ChartBase = require('./base');
@@ -236,7 +237,11 @@ define(function (require) {
                     var polygonPoints = currentPoints.slice();
                     var firstPoint = polygonPoints[0];
                     var lastPoint = polygonPoints[pointLen - 1];
-    
+        	       
+                    // Add same point into polyline to fit polygon
+                    currentPoints.unshift(firstPoint.slice());
+                    currentPoints.push(lastPoint.slice());
+
                     // Point projected on the axis
                     var firstPointProject = firstPoint.slice();
                     var lastPointProject = lastPoint.slice();
