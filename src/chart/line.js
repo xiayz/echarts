@@ -221,6 +221,7 @@ define(function (require) {
             // For chart with two value axes, it will use the x axis.
             var projectAxis = cartesian.getAxesByScale('ordinal')[0]
                 || cartesian.getAxis('x');
+            var orient = projectAxis.isHorizontal() ? 'horizontal' : 'vertical';
 
             var finishSegment = function () {
                 var pointLen = currentPoints.length;
@@ -232,8 +233,9 @@ define(function (require) {
                 }
                 // Finish prevous polygon shape
                 if (polygonShape && pointLen > 1) {
-                    var firstPoint = currentPoints[0];
-                    var lastPoint = currentPoints[pointLen - 1];
+                    var polygonPoints = currentPoints.slice();
+                    var firstPoint = polygonPoints[0];
+                    var lastPoint = polygonPoints[pointLen - 1];
     
                     // Point projected on the axis
                     var firstPointProject = firstPoint.slice();
@@ -243,22 +245,26 @@ define(function (require) {
                     firstPointProject[coordIdx] = lastPointProject[coordIdx] 
                         = projectAxis.otherCoord;
     
-                    currentPoints.unshift(
+                    polygonPoints.unshift(
                         // Duplicate points to make sharp turning
                         firstPointProject, firstPointProject.slice(),
                         firstPoint, firstPoint.slice()
                     );
-                    currentPoints.push(
+                    polygonPoints.push(
                         lastPoint, lastPoint.slice(),
                         lastPointProject, lastPointProject.slice()
                     );
     
-                    polygonShape.style.pointList = currentPoints;
+                    polygonShape.style.pointList = polygonPoints;
                     // TODO
                     // polygonShape.style.smoothConstraint = bbox;
                     shapeList.push(polygonShape);
                 }
+
+                chunk++;
             };
+
+            var chunk = 0;
 
             for (var i = 0; i < data.length; i++) {
                 var dataItem = data[i];
@@ -294,6 +300,7 @@ define(function (require) {
                             )
                         },
                         hoverable: false,
+                        _orient: orient,
                         _main: true,
                         _seriesIndex: seriesIndex
                     });
@@ -301,7 +308,7 @@ define(function (require) {
                     ecData.pack(
                         polylineShape,
                         series, seriesIndex,
-                        0, i, series.name
+                        0, chunk, series.name
                     );
 
                     // Polygon of area charts
@@ -317,14 +324,18 @@ define(function (require) {
                                        ? fillNormalColor
                                        : zrColor.alpha(defaultColor,0.5)
                             },
+                            highlightStyle: {
+                                brushType: 'fill'
+                            },
                             hoverable: false,
+                            _orient: orient,
                             _main: true,
                             _seriesIndex: seriesIndex
                         });
                         ecData.pack(
                             polygonShape,
                             series, seriesIndex,
-                            0, i, series.name
+                            0, chunk, series.name
                         );
                     }
                 }
@@ -473,7 +484,7 @@ define(function (require) {
             itemShape.zlevel = this.getZlevelBase();
             itemShape.z = this.getZBase() + 1;
             
-            if (this.deepQuery([data, serie, this.option], 'calculable')) {
+            if (deepQuery([data, serie, this.option], 'calculable')) {
                 this.setCalculable(itemShape);
                 itemShape.draggable = true;
             }
@@ -482,6 +493,7 @@ define(function (require) {
         },
 
         // 位置转换
+        // TODO
         getMarkCoord: function (seriesIndex, mpData) {
             var series = this.series[seriesIndex];
             var xMarkMap = this.xMarkMap[seriesIndex];
@@ -527,6 +539,7 @@ define(function (require) {
 
         /**
          * 动态数据增加动画 
+         * TODO
          */
         addDataAnimation: function (params, done) {
             var series = this.series;
@@ -567,7 +580,7 @@ define(function (require) {
                             
                         if (aniMap[seriesIndex][2]) {
                             // 队头加入删除末尾
-                            if (this.shapeList[i].type === 'half-smooth-polygon') {
+                            if (this.shapeList[i].type === 'polygon') {
                                 //区域图
                                 var len = pointList.length;
                                 this.shapeList[i].style.pointList[len - 3] = pointList[len - 2];
@@ -581,7 +594,7 @@ define(function (require) {
                         else {
                             // 队尾加入删除头部
                             this.shapeList[i].style.pointList.shift();
-                            if (this.shapeList[i].type === 'half-smooth-polygon') {
+                            if (this.shapeList[i].type === 'polygon') {
                                 //区域图
                                 var targetPoint =this.shapeList[i].style.pointList.pop();
                                 isHorizontal
