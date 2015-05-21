@@ -6,9 +6,10 @@
  * 
  * TODO
  *  - Large mode
- *  - Symbol
+ *  - Symbol, markPoint
  *  - Calcucalable
  *  - Polygon animation
+ *  - ontooltipHover
  */
 define(function (require) {
     var ChartBase = require('./base');
@@ -220,11 +221,15 @@ define(function (require) {
             // Axis which the points projected on to construct an area chart.
             // It will use the category axis if have one.
             // For chart with two value axes, it will use the x axis.
-            var projectAxis = cartesian.getAxesByScale('ordinal')[0]
-                || cartesian.getAxis('x');
+            var categoryAxis = cartesian.getAxesByScale('ordinal')[0]; 
+            var projectAxis = categoryAxis || cartesian.getAxis('x');
             var orient = projectAxis.isHorizontal() ? 'horizontal' : 'vertical';
 
             var finishSegment = function () {
+                if (! currentPoints) {
+                    return;
+                }
+
                 var pointLen = currentPoints.length;
                 // Finish previous polyline shape
                 if (polylineShape && pointLen > 1) {
@@ -277,10 +282,10 @@ define(function (require) {
 
                 // Create a new polyline if data is '-' or i === 0
                 if (! polylineShape || value === '-') {
-                    currentPoints = [];
-    	              
                     // Finish previus segment
                     finishSegment();
+
+                    currentPoints = [];
 
                     polylineShape = new PolylineShape({
                         zlevel: zlevel,
@@ -347,7 +352,22 @@ define(function (require) {
 
                 if (value !== '-') {
                     var point = points[i];
-                    currentPoints.push(point);   
+                    var name;
+                    if (categoryAxis) {
+                        name = categoryAxis.scale.getItem(i);
+                    }
+                    
+                    currentPoints.push(point);
+
+                    // Build symbol
+                    shapeList.push(this._getSymbol(
+                        seriesIndex,
+                        lineColor || normalColor || defaultColor,
+                        i, // data index
+                        name, // name
+                        point[0], point[1],
+                        orient
+                    ));
                 }
             }
             
@@ -356,15 +376,8 @@ define(function (require) {
 
         },
         
-        _isLarge: function(orient, singlePL) {
-            if (singlePL.length < 2) {
-                return false;
-            }
-            else {
-                return orient === 'horizontal'
-                       ? (Math.abs(singlePL[0][0] - singlePL[1][0]) < 0.5)
-                       : (Math.abs(singlePL[0][1] - singlePL[1][1]) < 0.5);
-            }
+        _isLarge: function() {
+            // TODO
         },
 
         /**
@@ -473,23 +486,25 @@ define(function (require) {
         /**
          * 生成折线图上的拐点图形
          */
-        _getSymbol: function (seriesIndex, dataIndex, name, x, y, orient) {
-            var series = this.series;
-            var serie = series[seriesIndex];
-            var data = serie.data[dataIndex];
-            
+        _getSymbol: function (seriesIndex, color, dataIndex, name, x, y, orient) {
+            var series = this.series[seriesIndex];
+            var data = series.data[dataIndex];
+            var symbolList = this.option.symbolList;
+            var symbol = query(series, 'symbol')
+                || symbolList[seriesIndex % symbolList.length];
+
             var itemShape = this.getSymbolShape(
-                serie, seriesIndex, data, dataIndex, name, 
+                series, seriesIndex, data, dataIndex, name, 
                 x, y,
-                this._sIndex2ShapeMap[seriesIndex], 
-                this._sIndex2ColorMap[seriesIndex],
+                symbol, 
+                color,
                 '#fff',
                 orient === 'vertical' ? 'horizontal' : 'vertical' // 翻转
             );
             itemShape.zlevel = this.getZlevelBase();
             itemShape.z = this.getZBase() + 1;
             
-            if (deepQuery([data, serie, this.option], 'calculable')) {
+            if (deepQuery([data, series, this.option], 'calculable')) {
                 this.setCalculable(itemShape);
                 itemShape.draggable = true;
             }
@@ -521,24 +536,7 @@ define(function (require) {
             var singlePL;
             var len = seriesIndex.length;
             while (len--) {
-                seriesPL = this.finalPLMap[seriesIndex[len]];
-                if (seriesPL) {
-                    for (var i = 0, l = seriesPL.length; i < l; i++) {
-                        singlePL = seriesPL[i];
-                        for (var j = 0, k = singlePL.length; j < k; j++) {
-                            if (dataIndex === singlePL[j][2]) {
-                                tipShape.push(this._getSymbol(
-                                    seriesIndex[len],   // seriesIndex
-                                    singlePL[j][2],     // dataIndex
-                                    singlePL[j][3],     // name
-                                    singlePL[j][0],     // x
-                                    singlePL[j][1],     // y
-                                    'horizontal'
-                                ));
-                            }
-                        }
-                    }
-                }
+                // TODO
             }
         },
 
@@ -559,6 +557,7 @@ define(function (require) {
             var seriesIndex;
             var pointList;
             var isHorizontal; // 是否横向布局， isHorizontal;
+            var shapeList = this.shapeList;
 
             var aniCount = 0;
             function animationDone() {
@@ -572,69 +571,70 @@ define(function (require) {
                 target.style.controlPointList = null;
             }
 
-            for (var i = this.shapeList.length - 1; i >= 0; i--) {
-                seriesIndex = this.shapeList[i]._seriesIndex;
+            for (var i = shapeList.length - 1; i >= 0; i--) {
+                var shape = shapeList[i];
+                seriesIndex = shape._seriesIndex;
                 if (aniMap[seriesIndex] && !aniMap[seriesIndex][3]) {
                     // 有数据删除才有移动的动画
-                    if (this.shapeList[i]._main && this.shapeList[i].style.pointList.length > 1) {
-                        pointList = this.shapeList[i].style.pointList;
+                    if (shape._main && shape.style.pointList.length > 1) {
+                        pointList = shape.style.pointList;
                         // 主线动画
                         dx = Math.abs(pointList[0][0] - pointList[1][0]);
                         dy = Math.abs(pointList[0][1] - pointList[1][1]);
-                        isHorizontal = this.shapeList[i]._orient === 'horizontal';
+                        isHorizontal = shape._orient === 'horizontal';
                             
                         if (aniMap[seriesIndex][2]) {
                             // 队头加入删除末尾
-                            if (this.shapeList[i].type === 'polygon') {
+                            if (shape.type === 'polygon') {
                                 //区域图
                                 var len = pointList.length;
-                                this.shapeList[i].style.pointList[len - 3] = pointList[len - 2];
-                                this.shapeList[i].style.pointList[len - 3][isHorizontal ? 0 : 1]
+                                shape.style.pointList[len - 3] = pointList[len - 2];
+                                shape.style.pointList[len - 3][isHorizontal ? 0 : 1]
                                     = pointList[len - 4][isHorizontal ? 0 : 1];
-                                this.shapeList[i].style.pointList[len - 2] = pointList[len - 1];
+                                shape.style.pointList[len - 2] = pointList[len - 1];
                             }
-                            this.shapeList[i].style.pointList.pop();
+                            shape.style.pointList.pop();
                             isHorizontal ? (x = dx, y = 0) : (x = 0, y = -dy);
                         }
                         else {
                             // 队尾加入删除头部
-                            this.shapeList[i].style.pointList.shift();
-                            if (this.shapeList[i].type === 'polygon') {
+                            shape.style.pointList.shift();
+                            if (shape.type === 'polygon') {
                                 //区域图
-                                var targetPoint =this.shapeList[i].style.pointList.pop();
+                                var targetPoint =shape.style.pointList.pop();
                                 isHorizontal
                                 ? (targetPoint[0] = pointList[0][0])
                                 : (targetPoint[1] = pointList[0][1]);
-                                this.shapeList[i].style.pointList.push(targetPoint);
+                                shape.style.pointList.push(targetPoint);
                             }
                             isHorizontal ? (x = -dx, y = 0) : (x = 0, y = dy);
                         }
-                        this.shapeList[i].style.controlPointList = null;
+                        shape.style.controlPointList = null;
                         
-                        this.zr.modShape(this.shapeList[i]);
+                        this.zr.modShape(shape);
                     }
                     else {
                         // 拐点动画
                         if (aniMap[seriesIndex][2] 
-                            && this.shapeList[i]._dataIndex 
+                            && shape._dataIndex 
                                 === series[seriesIndex].data.length - 1
                         ) {
                             // 队头加入删除末尾
-                            this.zr.delShape(this.shapeList[i].id);
+                            this.zr.delShape(shape.id);
                             continue;
                         }
                         else if (!aniMap[seriesIndex][2] 
-                                 && this.shapeList[i]._dataIndex === 0
+                                 && shape._dataIndex === 0
                         ) {
                             // 队尾加入删除头部
-                            this.zr.delShape(this.shapeList[i].id);
+                            this.zr.delShape(shape.id);
                             continue;
                         }
                     }
-                    this.shapeList[i].position = [0, 0];
+                    shape.position = [0, 0];
 
                     aniCount++;
-                    this.zr.animate(this.shapeList[i].id, '')
+                    this.zr.animate(shape.id, '')
                         .when(
                             this.query(this.option, 'animationDurationUpdate'),
                             { position: [ x, y ] }

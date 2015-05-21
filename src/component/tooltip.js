@@ -414,9 +414,7 @@ define(function (require) {
                             var cartesian = grid.getCartesian(
                                 serie.xAxisIndex, serie.yAxisIndex
                             );
-                            this._showCartesianAxisTrigger(
-                              cartesian, ecData.get(currentTarget, 'dataIndex')
-                            );
+                            this._showCartesianAxisTrigger(cartesian);
                         }   
                     }
                     else {
@@ -431,7 +429,9 @@ define(function (require) {
             var grid = this.component.grid;
     	
             if (grid) {
-                zrUtil.each(grid.getAllCartesians(), this._showCartesianAxisTrigger, this);
+                zrUtil.each(grid.getAllCartesians(), function (cartesian) {
+                    this._showCartesianAxisTrigger(cartesian);
+                }, this);
             }
         },
 
