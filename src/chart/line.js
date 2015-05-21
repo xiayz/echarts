@@ -136,7 +136,7 @@ define(function (require) {
                     var data = series.data;
                     
                     // Chart with two value axes doesn't support stacking
-                    if (series.stack && ! cartesian.getAxesByScale('ordinal').length) {
+                    if (series.stack && cartesian.getAxesByScale('ordinal').length) {
                         var dataStacked = [];
                         var stackKey = cartesian.name + series.stack;
                         var stackData = stackDataMap[stackKey];

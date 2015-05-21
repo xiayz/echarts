@@ -523,7 +523,7 @@ define(function (require) {
                         var value = queryValue(data[i], '-');
                         if (value !== '-') {
                             // 双数值轴不支持 stack
-                            if (series.stack && ! categoryAxis) {
+                            if (series.stack && categoryAxis) {
                                 // Stack
                                 var pKey = 'p' + valueAxisName;
                                 var nKey = 'n' + valueAxisName;

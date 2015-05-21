@@ -543,7 +543,7 @@ define(function (require) {
                         // Default formatter
                         formatter = '{b}';
                         for (var i = 0; i < params.length; i++) {
-                            formatter += '<br />{a} : {c}';
+                            formatter += '<br />{a' + i + '} : {c' + i + '}';
                         }
                     }
                     var seriesValues = zrUtil.map(params, function (item) {
