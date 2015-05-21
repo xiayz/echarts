@@ -906,6 +906,11 @@ define(function (require) {
                 }
             }
             
+            // Inject series index
+            zrUtil.each(magicOption.series, function (series, idx) {
+                series.seriesIndex = idx;
+            });
+            
             // 数值系列的颜色列表，不传则采用内置颜色，可配数组，借用zrender实例注入，会有冲突风险，先这样
             var themeColor = magicOption.color;
             if (!(themeColor && themeColor.length)) {
@@ -1054,7 +1059,7 @@ define(function (require) {
             );
             this._timeline = timeline;
             this.component.timeline = this._timeline;
-            
+
             return this;
         },
         
