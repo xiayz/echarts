@@ -104,7 +104,9 @@ define(function (require) {
     function Grid(ecTheme, messageCenter, zr, option, myChart) {
         Base.call(this, ecTheme, messageCenter, zr, option, myChart);
 
-        this._coords = {};
+        this._coordsMap = {};
+
+        this._coordsList = [];
 
         this._axes = {};
 
@@ -138,7 +140,7 @@ define(function (require) {
             return this._y + this._height;
         },
 
-        getArea: function () {
+        getRect: function () {
             return {
                 x: this._x,
                 y: this._y,
@@ -216,6 +218,13 @@ define(function (require) {
 
             this._initCartesian(this.option);
         },
+    	
+        /**
+         * Get all cartesian instances
+         */
+        getAllCartesians: function () {
+            return this._coordsList.slice();
+        },
 
         /**
          * Get cartesian instance
@@ -225,7 +234,7 @@ define(function (require) {
          */
         getCartesian: function (xIndex, yIndex) {
             var key = 'x' + xIndex + 'y' + yIndex;
-            return this._coords[key];
+            return this._coordsMap[key];
         },
 
         /**
@@ -306,7 +315,12 @@ define(function (require) {
             if (! (yAxesList instanceof Array)) {
                 yAxesList = [yAxesList];
             }
-
+    	    
+            var xAxesLen = xAxesList.length;
+            var yAxesLen = yAxesList.length;
+            /**
+             * @inner
+             */
             var getScaleByOption = function (axisType, axisOption) {
                 if (axisOption.type) {
                     return axisOption.type === 'value'
@@ -327,12 +341,39 @@ define(function (require) {
                 right: false
             };
 
+            // Find if any axis has position make the x axis vertical orientation
+            var isXHorizontal = true;
+            var position;
+            for (i = 0; i < xAxesLen; i++) {
+                // If has vertical x axis
+                position = xAxesList[i].position;
+                if (position === 'left' || position === 'right') {
+                    isXHorizontal = false;
+                    break;
+                }
+            }
+            if (isXHorizontal) {
+                // If has horizontal y axis
+                for (i = 0; i < yAxesLen; i++) {
+                    position = yAxesList[i].position;
+                    if (position === 'top' || position === 'bottom') {
+                        isXHorizontal = false;
+                        break;
+                    }
+                }
+            }
+            /**
+             * @inner
+             */
             var getCoordExtent = function (axisType, axisOption) {
                 var position = axisOption.position;
                 if (! position) {
                     // Default axis position:
                     //  x axis on the bottom and y axis on the left
-                    if (axisType === 'x') {
+                    if (
+                        (axisType === 'x' && isXHorizontal)
+                        || (axisType === 'y' && ! isXHorizontal)
+                    ) {
                         position = gridPositionOccupied.bottom ? 
                             'top ' : 'bottom';
                     }
@@ -366,13 +407,14 @@ define(function (require) {
             var coordExtent;
             var axisX;
             var axisY;
-            for (i = 0; i < xAxesList.length; i++) {
+            for (i = 0; i < xAxesLen; i++) {
                 xAxisOpt = xAxesList[i];
-                for (j = 0; j < yAxesList.length; j++) {
+                for (j = 0; j < yAxesLen; j++) {
                     yAxisOpt = yAxesList[j];
                     key = 'x' + i + 'y' + j;
                     cartesian = new Cartesian(key);
-                    this._coords[key] = cartesian;
+                    this._coordsMap[key] = cartesian;
+                    this._coordsList.push(cartesian);
 
                     // Create x axis
                     coordExtent = getCoordExtent('x', xAxisOpt);
@@ -425,6 +467,8 @@ define(function (require) {
             var stackDataMap = {};
             var coordDataMap = {};
             zrUtil.each(option.series, function (series, idx) {
+                var legend = this.component.legend;
+
                 var chartType = series.type;
                 var defaultCfg = ecConfig[chartType];
                 var queryTarget = [series, defaultCfg];
