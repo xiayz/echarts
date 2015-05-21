@@ -407,6 +407,8 @@ define(function (require) {
             var coordExtent;
             var axisX;
             var axisY;
+            var horizontalAxis;
+            var verticalAxis;
             for (i = 0; i < xAxesLen; i++) {
                 xAxisOpt = xAxesList[i];
                 for (j = 0; j < yAxesLen; j++) {
@@ -441,8 +443,6 @@ define(function (require) {
                     this._axes['y' + i] = axisY;
                     
                     // Adjust axis direction
-                    var horizontalAxis;
-                    var verticalAxis;
                     if (axisX.isHorizontal()) {
                         horizontalAxis = axisX;
                         verticalAxis = axisY;

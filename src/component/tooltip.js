@@ -469,7 +469,7 @@ define(function (require) {
             var yAxis = cartesian.getAxis('y');
 
             var swapped = yAxis.isHorizontal();
-            
+
             var dataX = xAxis.coordToData(swapped ? mouseY : mouseX, true);
             var dataY = yAxis.coordToData(swapped ? mouseX : mouseY, true);
 
@@ -481,6 +481,11 @@ define(function (require) {
                 // Snapped tooltip because category axis is discrete
                 mouseX = xAxis.dataToCoord(dataX);
                 mouseY = yAxis.dataToCoord(dataY);
+                if (swapped) {
+                    var tmp = mouseX;
+                    mouseX = mouseY;
+                    mouseY = tmp;
+                }
 
                 if (dataIndex == null) {
         	       dataIndex = categoryAxis === xAxis ? dataX : dataY;
