@@ -8,7 +8,7 @@
 define(function (require) {
     var zrUtil = require('zrender/tool/util');
     var curveTool = require('zrender/tool/curve');
-    
+
     /**
      * 折线型动画
      * 
@@ -23,28 +23,32 @@ define(function (require) {
         var newPointListLen = newPointList.length;
         var oldPointList;
 
-        if (!oldShape) {        // add
+        if (!oldShape) {
+            // For area chart, not consider the four project points
+            // TODO Better way
+            var nProjectPoints = newShape.type === 'polygon' ? 4 : 0;
+
             oldPointList = [];
             if (newShape._orient != 'vertical') {
                 var y = newPointList[0][1];
-                for (var i = 0; i < newPointListLen; i++) {
+                for (var i = 0; i < newPointListLen - nProjectPoints; i++) {
                     oldPointList[i] = [newPointList[i][0], y];
                 }
             }
             else {
                 var x = newPointList[0][0];
-                for (var i = 0; i < newPointListLen; i++) {
+                for (var i = 0; i < newPointListLen - nProjectPoints; i++) {
                     oldPointList[i] = [x, newPointList[i][1]];
                 }
             }
-
-            if (newShape.type == 'half-smooth-polygon') {
-                oldPointList[newPointListLen - 1] = zrUtil.clone(newPointList[newPointListLen - 1]);
-                oldPointList[newPointListLen - 2] = zrUtil.clone(newPointList[newPointListLen - 2]);
+            // Project points keep same
+            for (;i < newPointListLen; i++) {
+                oldPointList[i] = newPointList[i];
             }
+
             oldShape = {style : {pointList : oldPointList}};
         }
-        
+
         oldPointList = oldShape.style.pointList;
         var oldPointListLen = oldPointList.length;
         if (oldPointListLen == newPointListLen) {

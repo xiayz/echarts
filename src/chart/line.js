@@ -242,13 +242,14 @@ define(function (require) {
                 }
                 // Finish prevous polygon shape
                 if (polygonShape && pointLen > 1) {
-                    var polygonPoints = currentPoints.slice();
-                    var firstPoint = polygonPoints[0];
-                    var lastPoint = polygonPoints[pointLen - 1];
+                    var firstPoint = currentPoints[0];
+                    var lastPoint = currentPoints[pointLen - 1];
 
-                    // Add same point into polyline to fit polygon
+                    // Duplicate points to make sharp turning in area charts
                     currentPoints.unshift(firstPoint.slice());
                     currentPoints.push(lastPoint.slice());
+
+                    var polygonPoints = currentPoints.slice();
 
                     // Point projected on the axis
                     var firstPointProject = firstPoint.slice();
@@ -257,15 +258,11 @@ define(function (require) {
                     var coordIdx = projectAxis.isHorizontal() ? 1 : 0;
                     firstPointProject[coordIdx] = lastPointProject[coordIdx] 
                         = projectAxis.otherCoord;
-    
-                    polygonPoints.unshift(
-                        // Duplicate points to make sharp turning
-                        firstPointProject, firstPointProject.slice(),
-                        firstPoint, firstPoint.slice()
-                    );
+
+                    // Append project points in the tail
                     polygonPoints.push(
-                        lastPoint, lastPoint.slice(),
-                        lastPointProject, lastPointProject.slice()
+                        lastPointProject, lastPointProject.slice(),
+                        firstPointProject, firstPointProject.slice()
                     );
     
                     polygonShape.style.pointList = polygonPoints;

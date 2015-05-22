@@ -1254,7 +1254,7 @@ define(function (require) {
         _animateMod: function (oldShape, newShape, duration, easing, delay, isUpdate) {
             switch (newShape.type) {
                 case 'polyline' :
-                case 'half-smooth-polygon' :
+                case 'polygon' :
                     ecAnimation.pointList(this.zr, oldShape, newShape, duration, easing);
                     break;
                 case 'rectangle' :
