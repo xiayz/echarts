@@ -17,11 +17,14 @@
  * - Time formattter
  * - Label rotation
  * - Label clickable and hightlight color
- * - Category interval
  * - boundaryGap
  * - min, max, splitNumber
+ * - axisTick.onGap
+ * - scale
  * 
  * - axisLine add halfLineWidth offset ?
+ * 
+ * - minor ticks
  */
 define(function (require) {
     var Base = require('./base');
@@ -40,6 +43,8 @@ define(function (require) {
     var component = require('../component');
 
     var round = Math.round;
+    var mathMin = Math.min;
+    var mathMax = Math.max;
     /**************************************
      * 坐标轴配置项，分为数值型和类目型
      **************************************/
@@ -160,6 +165,32 @@ define(function (require) {
         }
     };
 
+
+    function rectUnion(a, b) {
+        var x = mathMin(a.x, b.x);
+        var y = mathMin(a.y, b.y);
+        return {
+            x: x,
+            y: y,
+            width: mathMax(a.x + a.width, b.x + b.width) - x,
+            height: mathMax(a.y + a.height, b.y + b.height) - y   
+        };
+    }
+
+    function rectIntersect(a, b) {
+        var ax0 = a.x;
+        var ax1 = a.x + a.width;
+        var ay0 = a.y;
+        var ay1 = a.y + a.height;
+        
+        var bx0 = b.x;
+        var bx1 = b.x + b.width;
+        var by0 = b.y;
+        var by1 = b.y + b.height;
+        
+        return ! (ax1 < bx0 || bx1 < ax0 || ay1 < by0 || by1 < ay0); 
+    }
+
     /**
      * 构造函数
      * @param {Object} messageCenter echart消息中心
@@ -225,9 +256,11 @@ define(function (require) {
 
             option.axisLine.show && this._buildAxisLine(axis, option);
             option.axisTick.show && this._buildAxisTick(axis, option);
-            option.axisLabel.show && this._buildAxisLabel(axis, option);
+            
+            var labelShowList = 
+                option.axisLabel.show && this._buildAxisLabel(axis, option);
 
-            this._buildSplitLineArea(axis, option);
+            this._buildSplitLineArea(axis, option, labelShowList);
 
             for (var i = 0, l = shapeList.length; i < l; i++) {
                 this.zr.addShape(shapeList[i]);
@@ -319,6 +352,12 @@ define(function (require) {
             var tickLen = tickOption.length;
             var tickColor = lineStyleOption.color;
             var tickLineWidth = lineStyleOption.width;
+            var tickInterval = tickOption.interval || 0;
+            var isTickIntervalFunction = typeof tickInterval === 'function';
+            // PENDING Axis tick don't have the situation that don't have enough space to place
+            if (tickInterval === 'auto') {
+                tickInterval = 0;
+            }
 
             // Sub pixel optimize
             var offset = round(tickLineWidth) % 2 / 2;
@@ -328,6 +367,20 @@ define(function (require) {
             var ticksCoords = axis.getTicksCoords();
 
             for (var i = 0; i < ticksCoords.length; i++) {
+                // Only ordinal scale support tick interval
+                if (axis.scale.type === 'ordinal') {
+                    if (isTickIntervalFunction) {
+                        if (! tickInterval(i, axis.scale.getItem(i))) {
+                            continue;
+                        }
+                    }
+                    else {
+                        if (i % (tickInterval + 1)) {
+                            continue;
+                        }
+                    }
+                }
+
                 var tickCoord = ticksCoords[i] + offset;
 
                 var x;
@@ -352,7 +405,7 @@ define(function (require) {
                 // Tick line
                 var shape = new LineShape({
                     zlevel: this.getZlevelBase(),
-                    z: this.getZBase(),
+                    z: this.getZBase() + 1,
                     hoverable: false,
                     style: {
                         xStart: x,
@@ -372,8 +425,6 @@ define(function (require) {
             var labelOption = option.axisLabel;
             var textStyle = labelOption.textStyle;
 
-            var labelRotate = labelOption.rotate;
-
             var formatter = labelOption.formatter;
             if (! formatter) {
                 // Default formatter
@@ -392,7 +443,7 @@ define(function (require) {
                 formatter = (function (tpl) {
                     return function (val) {
                         return tpl.replace('{value}', val);
-                    }
+                    };
                 })(formatter);
             }
 
@@ -400,7 +451,38 @@ define(function (require) {
             var labelMargin = labelOption.margin;
             var grid = this.component.grid;
 
+            var axisPosition = axis.position;
+
+            var labelRotate = labelOption.rotate;
+
+            var labelInterval = labelOption.interval || 0;
+            var isLabelIntervalFunction = typeof labelInterval === 'function';
+
+            var labelShowList = [];
+
+            var textSpaceTakenRect;
             for (var i = 0; i < ticks.length; i++) {
+                // Default is false
+                labelShowList[i] = false;
+
+                var needsCheckTextSpace = false;
+                // Only ordinal scale support label interval
+                if (axis.scale.type === 'ordinal') {
+                    if (labelInterval === 'auto') {
+                        needsCheckTextSpace = true;
+                    }
+                    else if (isLabelIntervalFunction) {
+                        if (! labelInterval(i, axis.scale.getItem(i))) {
+                            continue;
+                        }
+                    }
+                    else {
+                        if (i % (labelInterval + 1)) {
+                            continue;
+                        }
+                    }
+                }
+
                 var tick = ticks[i];
                 var tickCoord = axis.dataToCoord(tick);
 
@@ -418,7 +500,7 @@ define(function (require) {
                 var labelTextBaseline = 'middle';
                 var x;
                 var y;
-                switch (axis.position) {
+                switch (axisPosition) {
                     case 'top':
                         y = grid.getY() - labelMargin;
                         x = tickCoord;
@@ -451,23 +533,43 @@ define(function (require) {
                     z: this.getZBase(),
                     hoverable: false,
                     style: {
-                        x: 0,
-                        y: 0,
+                        x: x,
+                        y: y,
 
                         text: text,
                         textFont: this.getFont(textStyle),
                         textAlign: labelTextAlign,
                         textBaseline: labelTextBaseline
                     },
-                    position: [x, y],
-                    rotation: [labelRotate * Math.PI / 180, 0, 0]
+                    rotation: [labelRotate * Math.PI / 180, x, y]
                 });
+
+                // Label with rotation don't check if have enough space to put
+                if (needsCheckTextSpace && ! labelRotate) {
+                    var rect = shape.getRect(shape.style);
+                    if (! textSpaceTakenRect) {
+                        textSpaceTakenRect = rect;
+                    }
+                    else {
+                        // There is no space for current label;
+                        if (rectIntersect(textSpaceTakenRect, rect)) {
+                            continue;
+                        }
+                        else {
+                            textSpaceTakenRect = rectUnion(textSpaceTakenRect, rect);
+                        }
+                    }
+                }
+
+                labelShowList[i] = true;
 
                 this.shapeList.push(shape);
             }
+
+            return labelShowList;
         },
 
-        _buildSplitLineArea: function (axis, option) {
+        _buildSplitLineArea: function (axis, option, showList) {
             var grid = this.component.grid;
 
             var splitLineOption = option.splitLine;
@@ -501,7 +603,17 @@ define(function (require) {
 
             var prevX = 0;
             var prevY = 0;
+
+            var lineCount = 0;
+            var areaCount = 0;
+
             for (var i = 0; i < ticksCoords.length; i++) {
+
+                // Split line visiblity is affected bt axis tick
+                // PENDING
+                if (showList && ! showList[i]) {
+                    continue;
+                }
 
                 var tickCoord = ticksCoords[i];
                 var x = tickCoord + offset;
@@ -514,7 +626,7 @@ define(function (require) {
                         z: z,
                         hoverable: false,
                         style: {
-                            strokeColor: lineColor[i % lineColorLen],
+                            strokeColor: lineColor[(lineCount++) % lineColorLen],
                             lineType: splitLineStyleOption.type,
                             lineWidth: lineWidth
                         }
@@ -542,12 +654,13 @@ define(function (require) {
                         z: z,
                         hoverable: false,
                         style: {
-                            color: areaColor[i % areaColorLen]
+                            color: areaColor[(areaCount++) % areaColorLen]
                         }
                     });
                     var shapeStyle = shape.style;
+
                     if (isHorizontal) {
-                        shapeStyle.x = prevX;
+                        shapeStyle.x = mathMin(prevX, x);
                         shapeStyle.y = y0;
                         // Math.abs in case coords is decreasing.
                         shapeStyle.width = Math.abs(x - prevX);
@@ -555,11 +668,13 @@ define(function (require) {
                     }
                     else {
                         shapeStyle.x = x0;
-                        shapeStyle.y = prevY;
+                        shapeStyle.y = mathMin(prevY, y);
                         shapeStyle.width = x1 - x0;
                         shapeStyle.height = Math.abs(y - prevY);
                     }
                     shapeList.push(shape);
+
+                    console.log(shape);
                 }
 
                 prevX = x;
