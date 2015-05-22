@@ -20,7 +20,6 @@
  * - Category interval
  * - boundaryGap
  * - min, max, splitNumber
- * - onZero
  * 
  * - axisLine add halfLineWidth offset ?
  */
@@ -214,7 +213,6 @@ define(function (require) {
                 );
 
                 var axis = grid.getAxis(axisTypeShort, i);
-                axis.scale.niceExtent();
                 this._buildShape(axis, axisOption);
             }
         },
@@ -264,26 +262,27 @@ define(function (require) {
 
             // Sub pixel optimize
             var offset = (round(lineWidth) % 2) / 2;
+            var otherCoord = axis.otherCoord + offset;
             switch (axis.position) {
                 case 'left':
-                    xStart = xEnd = x0 + offset;
+                    xStart = xEnd = otherCoord;
                     yStart = y1;
                     yEnd = y0;
                     break;
                 case 'right':
-                    xStart = xEnd = x1 + offset;
+                    xStart = xEnd = otherCoord;
                     yStart = y1;
                     yEnd = y0;
                     break;
                 case 'bottom':
                     xStart = x0;
                     xEnd = x1;
-                    yStart = yEnd = y1 + offset;
+                    yStart = yEnd = otherCoord;
                     break;
                 case 'top':
                     xStart = x0;
                     xEnd = x1;
-                    yStart = yEnd = y0 + offset;
+                    yStart = yEnd = otherCoord;
                     break;
             }
             var style = axShape.style;
@@ -368,12 +367,9 @@ define(function (require) {
 
         _buildAxisLabel: function (axis, option) {
             var labelOption = option.axisLabel;
-            var labelMargin = labelOption.margin;
             var textStyle = labelOption.textStyle;
 
             var labelRotate = labelOption.rotate;
-
-            var axisPosition = axis.position;
 
             var formatter = labelOption.formatter;
             if (! formatter) {
@@ -398,6 +394,8 @@ define(function (require) {
             }
 
             var ticks = axis.scale.getTicks();
+            var labelMargin = labelOption.margin;
+            var grid = this.component.grid;
 
             for (var i = 0; i < ticks.length; i++) {
                 var tick = ticks[i];
@@ -412,36 +410,32 @@ define(function (require) {
                 }
 
                 var text = formatter(label);
-                
-                var labelMarginX = 0;
-                var labelMarginY = 0;
+
                 var labelTextAlign = 'center';
                 var labelTextBaseline = 'middle';
                 var x;
                 var y;
-                if (axis.isHorizontal()) {
-                    x = tickCoord;
-                    y = axis.otherCoord;
-                    if (axisPosition === 'top') {
-                        labelMarginY = -labelMargin;
+                switch (axis.position) {
+                    case 'top':
+                        y = grid.getY() - labelMargin;
+                        x = tickCoord;
                         labelTextBaseline = 'bottom';
-                    }
-                    else {
-                        labelMarginY = labelMargin;
+                        break;
+                    case 'bottom':
+                        x = tickCoord;
+                        y = grid.getYend() + labelMargin;
                         labelTextBaseline = 'top';
-                    }
-                }
-                else {
-                    y = tickCoord;
-                    x = axis.otherCoord;
-                    if (axisPosition === 'left') {
-                        labelMarginX = -labelMargin;
+                        break;
+                    case 'left':
+                        x = grid.getX() - labelMargin;
+                        y = tickCoord;
                         labelTextAlign = 'right';
-                    }
-                    else {
-                        labelMarginX = labelMargin;
+                        break;
+                    case 'right':
+                        x = grid.getXend() + labelMargin;
+                        y = tickCoord;
                         labelTextAlign = 'left';
-                    }
+                        break;
                 }
 
                 var shape = new TextShape({
@@ -449,8 +443,8 @@ define(function (require) {
                     z: this.getZBase(),
                     hoverable: false,
                     style: {
-                        x: x + labelMarginX,
-                        y: y + labelMarginY,
+                        x: x,
+                        y: y,
 
                         text: text,
                         textFont: this.getFont(textStyle),

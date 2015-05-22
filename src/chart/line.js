@@ -6,10 +6,10 @@
  * 
  * TODO
  *  - Large mode
- *  - Symbol, markPoint
- *  - Calcucalable
- *  - Polygon animation
+ *  - markPoint
+ *  - Calcucalable, dragover not work
  *  - ontooltipHover
+ *  - addDataAnimation
  */
 define(function (require) {
     var ChartBase = require('./base');
@@ -649,14 +649,14 @@ define(function (require) {
                                 === series[seriesIndex].data.length - 1
                         ) {
                             // 队头加入删除末尾
-                            this.zr.delShape(shape.id);
+                            this.zr.delShape(shape);
                             continue;
                         }
                         else if (!aniMap[seriesIndex][2] 
                                  && shape._dataIndex === 0
                         ) {
                             // 队尾加入删除头部
-                            this.zr.delShape(shape.id);
+                            this.zr.delShape(shape);
                             continue;
                         }
                     }

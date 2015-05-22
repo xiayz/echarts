@@ -7,6 +7,7 @@
  *         Yi Shen(http://github.com/pissang)
  * TODO
  *  - eventRiver
+ *  - move shape construction out of grid
  */
 define(function (require) {
 
@@ -27,6 +28,7 @@ define(function (require) {
     var ecConfig = require('../config');
     var ecQuery = require('../util/ecQuery');
     var deepQuery = ecQuery.deepQuery;
+    var query = ecQuery.query;
     var queryValue = ecQuery.queryValue;
 
     // 网格
@@ -43,21 +45,18 @@ define(function (require) {
         borderWidth: 1,
         borderColor: '#ccc'
     };
-
-    var zrUtil = require('zrender/tool/util');
     	
     /**
      * Extend axis 2d
-     * @constructor
+     * @constructor module:echarts/component/grid~Axis2D
      * @extends {module:echarts/coord/Cartesian.Axis}
      * @param {string} name
      * @param {} scale
      * @param {Array.<number>} coordExtent
      * @param {string} axisType
      * @param {string} position
-     * @param {number} otherCoord
      */
-    var Axis2D = function (name, scale, coordExtent, axisType, position, otherCoord) {
+    var Axis2D = function (name, scale, coordExtent, axisType, position) {
         Axis.call(this, name, scale, coordExtent);
         /**
          * Axis type
@@ -81,7 +80,13 @@ define(function (require) {
         /**
          * Coord on the other axis
          */
-        this.otherCoord = otherCoord || 0;
+        this.otherCoord = 0;
+
+        /**
+         * Reference to the other axis
+         * @type {module:echarts/component/grid~Axis2D}
+         */
+        this.otherAxis = null;
     };
     
     Axis2D.prototype = {
@@ -315,9 +320,7 @@ define(function (require) {
             if (! (yAxesList instanceof Array)) {
                 yAxesList = [yAxesList];
             }
-    	    
-            var xAxesLen = xAxesList.length;
-            var yAxesLen = yAxesList.length;
+
             /**
              * @inner
              */
@@ -332,7 +335,7 @@ define(function (require) {
                         ? new IntervalScale()
                         : new OrdinalScale(axisOption.data);
                 }
-            }
+            };
 
             var gridPositionOccupied = {
                 left: false,
@@ -344,6 +347,8 @@ define(function (require) {
             // Find if any axis has position make the x axis vertical orientation
             var isXHorizontal = true;
             var position;
+            var xAxesLen = xAxesList.length;
+            var yAxesLen = yAxesList.length;
             for (i = 0; i < xAxesLen; i++) {
                 // If has vertical x axis
                 position = xAxesList[i].position;
@@ -396,7 +401,7 @@ define(function (require) {
                     case 'right':
                         return [gridY, gridY + gridHeight, gridX + gridWidth, position];
                 }
-            }
+            };
 
             var i;
             var j;
@@ -424,9 +429,9 @@ define(function (require) {
                         'x', getScaleByOption(xAxisOpt.type, xAxisOpt),
                         coordExtent.slice(0, 2),
                         xAxisOpt.type,
-                        coordExtent[3],
-                        coordExtent[2]
+                        coordExtent[3]
                     );
+                    axisX.otherCoord = coordExtent[2];
                     cartesian.addAxis(axisX);
                     this._axes['x' + i] = axisX;
 
@@ -436,12 +441,15 @@ define(function (require) {
                         'y', getScaleByOption(yAxisOpt.type, yAxisOpt),
                         coordExtent.slice(0, 2),
                         yAxisOpt.type,
-                        coordExtent[3],
-                        coordExtent[2]
+                        coordExtent[3]
                     );
+                    axisY.otherCoord = coordExtent[2];
                     cartesian.addAxis(axisY);
                     this._axes['y' + i] = axisY;
                     
+                    axisX.otherAxis = axisY;
+                    axisY.otherAxis = axisX;
+
                     // Adjust axis direction
                     if (axisX.isHorizontal()) {
                         horizontalAxis = axisX;
@@ -462,13 +470,35 @@ define(function (require) {
                 }
             }
 
-            // Data
+            this._updateCartesianFromSeries(option.series);
+
+            // Set axis from option
+            zrUtil.each(this._axes, function (axis) {
+                axis.scale.niceExtent();
+            });
+
+            // Adjust axis coord on the zero position of the other axis
+            zrUtil.each(this._axes, function (axis) {
+                var nameShort = axis.type;
+                var name = nameShort + 'Axis';
+                var onZero = deepQuery([option, ecConfig], name + '.axisLine.onZero');
+                if (onZero) {
+                    axis.otherCoord = axis.otherAxis.dataToCoord(0);
+                }
+            });
+        },
+
+        /**
+         * Update cartesian properties from series
+         * @param  {Array.<Object>} seriesArray
+         * @private
+         */
+        _updateCartesianFromSeries: function (seriesArray) {
+
             // TODO Event River
             var stackDataMap = {};
             var coordDataMap = {};
-            zrUtil.each(option.series, function (series, idx) {
-                var legend = this.component.legend;
-
+            zrUtil.each(seriesArray, function (series, idx) {
                 var chartType = series.type;
                 var defaultCfg = ecConfig[chartType];
                 var queryTarget = [series, defaultCfg];
@@ -481,7 +511,7 @@ define(function (require) {
                     var cartesian = this.getCartesian(xAxisIndex, yAxisIndex);
 
                     cartesian.series.push(series);
-    	            
+                    
                     var coordKey = chartType + cartesian.name;
                     var stackKey = coordKey + series.stack;
                     // Accumulated data for stack charts
