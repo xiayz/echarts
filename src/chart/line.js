@@ -94,8 +94,6 @@ define(function (require) {
         // 图表基类
         ChartBase.call(this, ecTheme, messageCenter, zr, option, myChart);
 
-        this._stackDataMap = {};
-        
         this.refresh(option);
     }
     
@@ -106,6 +104,11 @@ define(function (require) {
          * 刷新
          */
         refresh: function (newOption) {
+
+            this._stackDataMap = {};
+    
+            // Stacked calculable symbol position to avoid overlap.
+            this._calculableStackMap = {};
 
             this.backupShapeList();
 
@@ -167,7 +170,7 @@ define(function (require) {
 
                         data = dataStacked;
                     }
-                    
+
                     var points = grid.dataToCoords(data, xAxisIndex, yAxisIndex);
                     this._buildSeriesShapes(idx, points, cartesian);
                 }
@@ -350,8 +353,13 @@ define(function (require) {
                     }
                 }
 
+                var showAllSymbol = deepQuery([dataItem, series], 'showAllSymbol');
+                var symbol = deepQuery([dataItem, series], 'symbol');
+                var calculable = deepQuery([dataItem, series, this.option], 'calculable');
+                var point = points[i];
+                // PENDING Calculable must show symbol ?
+                showAllSymbol = (showAllSymbol || calculable) && symbol !== 'none';
                 if (value !== '-') {
-                    var point = points[i];
                     var name;
                     if (categoryAxis) {
                         name = categoryAxis.scale.getItem(i);
@@ -360,22 +368,98 @@ define(function (require) {
                     currentPoints.push(point);
 
                     // Build symbol
-                    shapeList.push(this._getSymbol(
-                        seriesIndex,
-                        lineColor || normalColor || defaultColor,
-                        i, // data index
-                        name, // name
-                        point[0], point[1],
-                        orient
-                    ));
+                    if (showAllSymbol) {
+                        var symbolShape = this._getSymbol(
+                            seriesIndex,
+                            lineColor || normalColor || defaultColor,
+                            i, // data index
+                            name, // name
+                            point[0], point[1],
+                            orient
+                        );
+                        if (calculable) {
+                            this.setCalculable(symbolShape);
+                            symbolShape.draggable = true;
+                        }
+                        shapeList.push(symbolShape);
+                    }
+                }
+                else {
+                    // Symbol for empty draggable data
+                    if (showAllSymbol && calculable) {
+                        var color = deepQuery(
+                            [series, this.ecTheme, ecConfig], 'calculableHolderColor'
+                        );
+                        var stackKey = cartesian.name + '_' + i;
+                        var calculableStackMap = this._calculableStackMap;
+                        var offset = calculableStackMap[stackKey] || 0;
+
+                        var symbolSize = deepQuery([data, series], 'symbolSize');
+                        var x = point[0];
+                        var y = point[1];
+                        var grid = this.component.grid;
+                        offset += symbolSize * 2 + 5;
+                        calculableStackMap[stackKey] = offset + symbolSize;
+
+                        switch (projectAxis.position) {
+                            case 'bottom':
+                                y = grid.getY() + offset;
+                                break;
+                            case 'top':
+                                y = grid.getYend() - offset;
+                                break;
+                            case 'left':
+                                x = grid.getXend() - offset;
+                                break;
+                            case 'right':
+                                x = grid.getX() + offset;
+                                break;
+                        }
+                        var symbolShape = this._getSymbol(
+                            seriesIndex,
+                            color,
+                            i, // data index
+                            name, // name
+                            x, y,
+                            orient
+                        );
+                        symbolShape.hoverable = false;
+                        symbolShape.style.text = false;
+                        symbolShape.rotation = [0, 0];
+                        
+                        shapeList.push(symbolShape);
+                    }
                 }
             }
             
             // Finish last segment
             finishSegment();
-
         },
         
+        /**
+         * 生成折线图上的拐点图形
+         */
+        _getSymbol: function (seriesIndex, color, dataIndex, name, x, y, orient) {
+            var series = this.series[seriesIndex];
+            var data = series.data[dataIndex];
+            var symbolList = this.option.symbolList;
+            var symbol = query(series, 'symbol')
+                || symbolList[seriesIndex % symbolList.length];
+
+            var itemShape = this.getSymbolShape(
+                series, seriesIndex, data, dataIndex, name, 
+                x, y,
+                symbol, 
+                color,
+                '#fff',
+                orient === 'vertical' ? 'horizontal' : 'vertical' // 翻转
+            );
+            itemShape.zlevel = this.getZlevelBase();
+            itemShape.z = this.getZBase() + 1;
+
+            return itemShape;
+        },
+
         _isLarge: function() {
             // TODO
         },
@@ -458,58 +542,6 @@ define(function (require) {
                 newList.push(newItem);
             }
             return newList;
-        },
-
-        /**
-         * 生成空数据所需的可计算提示图形
-         */
-        _getCalculableItem: function (seriesIndex, dataIndex, name, x, y, orient) {
-            var series = this.series;
-            var color = series[seriesIndex].calculableHolderColor
-                        || this.ecTheme.calculableHolderColor
-                        || ecConfig.calculableHolderColor;
-
-            var itemShape = this._getSymbol(
-                seriesIndex, dataIndex, name,
-                x, y, orient
-            );
-            itemShape.style.color = color;
-            itemShape.style.strokeColor = color;
-            itemShape.rotation = [0,0];
-            itemShape.hoverable = false;
-            itemShape.draggable = false;
-            itemShape.style.text = '';
-
-            return itemShape;
-        },
-
-        /**
-         * 生成折线图上的拐点图形
-         */
-        _getSymbol: function (seriesIndex, color, dataIndex, name, x, y, orient) {
-            var series = this.series[seriesIndex];
-            var data = series.data[dataIndex];
-            var symbolList = this.option.symbolList;
-            var symbol = query(series, 'symbol')
-                || symbolList[seriesIndex % symbolList.length];
-
-            var itemShape = this.getSymbolShape(
-                series, seriesIndex, data, dataIndex, name, 
-                x, y,
-                symbol, 
-                color,
-                '#fff',
-                orient === 'vertical' ? 'horizontal' : 'vertical' // 翻转
-            );
-            itemShape.zlevel = this.getZlevelBase();
-            itemShape.z = this.getZBase() + 1;
-            
-            if (deepQuery([data, series, this.option], 'calculable')) {
-                this.setCalculable(itemShape);
-                itemShape.draggable = true;
-            }
-            
-            return itemShape;
         },
 
         // 位置转换

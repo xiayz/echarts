@@ -180,7 +180,12 @@ define(function (require) {
 
         type: ecConfig.COMPONENT_TYPE_AXIS,
 
-        refresh: function (option) {
+        refresh: function (newOption) {
+            if (newOption) {
+                this.option = newOption;
+            }
+            var option = this.option;
+
             var grid = this.component.grid;
 
             var axisType = this.type;
