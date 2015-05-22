@@ -180,6 +180,8 @@ define(function (require) {
         type: ecConfig.COMPONENT_TYPE_AXIS,
 
         refresh: function (newOption) {
+            this.clear();
+
             if (newOption) {
                 this.option = newOption;
             }
@@ -219,13 +221,14 @@ define(function (require) {
 
         _buildShape: function (axis, option) {
 
+            var shapeList = this.shapeList;
+
             option.axisLine.show && this._buildAxisLine(axis, option);
             option.axisTick.show && this._buildAxisTick(axis, option);
             option.axisLabel.show && this._buildAxisLabel(axis, option);
 
             this._buildSplitLineArea(axis, option);
 
-            var shapeList = this.shapeList;
             for (var i = 0, l = shapeList.length; i < l; i++) {
                 this.zr.addShape(shapeList[i]);
             }
@@ -437,20 +440,27 @@ define(function (require) {
                         labelTextAlign = 'left';
                         break;
                 }
+                if (axis.isHorizontal()) {
+                    if (labelRotate) {
+                        labelTextAlign = labelRotate > 0 ? 'left' : 'right';
+                    }
+                }
 
                 var shape = new TextShape({
                     zlevel: this.getZlevelBase(),
                     z: this.getZBase(),
                     hoverable: false,
                     style: {
-                        x: x,
-                        y: y,
+                        x: 0,
+                        y: 0,
 
                         text: text,
                         textFont: this.getFont(textStyle),
                         textAlign: labelTextAlign,
                         textBaseline: labelTextBaseline
-                    }
+                    },
+                    position: [x, y],
+                    rotation: [labelRotate * Math.PI / 180, 0, 0]
                 });
 
                 this.shapeList.push(shape);
@@ -475,7 +485,7 @@ define(function (require) {
             var lineColorLen = lineColor.length;
             var areaColorLen = areaColor.length;
 
-            var offset = (1 - round(lineWidth) % 2) / 2;
+            var offset = (round(lineWidth) % 2) / 2;
 
             var x0 = grid.getX();
             var y0 = grid.getY();
