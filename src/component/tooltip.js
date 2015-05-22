@@ -86,8 +86,7 @@ define(function (require) {
             .replace(/"/g, '&quot;')
             .replace(/'/g, '&#39;');   
     }
-    
-    
+
     var tplVariables = ['a', 'b', 'c', 'd', 'e'];
     function stringFormatter(tpl, seriesValues) {
         var str = tpl;
@@ -108,8 +107,8 @@ define(function (require) {
         }
         return str;
     }
-    
-        // 通用样式
+
+    // 通用样式
     var gCssText = 'position:absolute;display:block;border-style:solid;white-space:nowrap;';
     /**
      * 构造函数
@@ -317,7 +316,7 @@ define(function (require) {
             }
             this.showing = false;
         },
-        
+
         _showTooltip: function (position, x, y, specialCssText) {
             var tDom = this._tDom;
             var domHeight = tDom.offsetHeight;
@@ -355,7 +354,7 @@ define(function (require) {
             }
             this.showing = true;
         },
-        
+
         _refixed: function () {
             var tDom = this._tDom;
             if (tDom) {
@@ -375,7 +374,7 @@ define(function (require) {
                 }
             }
         },
-        
+
         _tryShow: function () {
             var needShow;
             var trigger;
@@ -423,11 +422,11 @@ define(function (require) {
                 }
             }
         },
-        
+
         _findAxisTrigger: function () {
             
             var grid = this.component.grid;
-    	
+
             if (grid) {
                 zrUtil.each(grid.getAllCartesians(), function (cartesian) {
                     this._showCartesianAxisTrigger(cartesian);
@@ -448,7 +447,7 @@ define(function (require) {
                 null,
                 this.myChart
             );
-    	    
+
             var grid = this.component.grid;
             var tDom = this._tDom;
             var tooltipOption = this.option.tooltip;
@@ -460,7 +459,7 @@ define(function (require) {
             if (! tooltipOption.show) {
                 return;
             }
-    
+
             var event = this._event;
             var mouseX = zrEvent.getX(event);
             var mouseY = zrEvent.getY(event);
@@ -488,7 +487,7 @@ define(function (require) {
                 }
 
                 if (dataIndex == null) {
-        	       dataIndex = categoryAxis === xAxis ? dataX : dataY;
+                   dataIndex = categoryAxis === xAxis ? dataX : dataY;
                 }
 
                 zrUtil.each(cartesian.series, function (series) {
@@ -503,7 +502,7 @@ define(function (require) {
                     if (dataItem) {
                         value = queryValue(dataItem);
                     }
-        	        // 寻找高亮元素
+                    // 寻找高亮元素
                     this.messageCenter.dispatch(
                         ecConfig.EVENT.TOOLTIP_HOVER,
                         this._event,
@@ -529,7 +528,7 @@ define(function (require) {
                         3: dataItem
                     });
                 }, this);
-    	
+
                 if (typeof formatter === 'function') {
                     var ticket = 'axis:' + dataIndex;
                     this._curTicket = ticket;
@@ -559,13 +558,13 @@ define(function (require) {
                     });
                     tDom.innerHTML = stringFormatter(formatter, seriesValues);
                 }
-                
+
                 // don't modify, just false, showContent == undefined == true
                 if (showContent === false || !tooltipOption.showContent) {
                     // 只用tooltip的行为，不显示主体
                     return;
                 }
-                
+
                 if (!this._hasAppend) {
                     tDom.style.left = this._zrWidth / 2 + 'px';
                     tDom.style.top = this._zrHeight / 2 + 'px';
@@ -613,13 +612,13 @@ define(function (require) {
                 }
             }
         },
-        
+
         /**
          * 极坐标 
          */
         _showPolarAxisTrigger: function (polarIndex, dataIndex) {
         },
-        
+
         /**
          * @parma {boolean} axisTrigger 
          */
@@ -767,7 +766,7 @@ define(function (require) {
             else {
                 this._hide();
             }
-            
+
             // don't modify, just false, showContent == undefined == true
             if (showContent === false || ! tooltipOption.showContent) {
                 // 只用tooltip的行为，不显示主体
@@ -780,7 +779,7 @@ define(function (require) {
                 this.dom.firstChild.appendChild(tDom);
                 this._hasAppend = true;
             }
-            
+
             this._showTooltip(position, x + 20, y - 20, specialCssText);
         },
 
@@ -836,7 +835,7 @@ define(function (require) {
                 return html;
             }
         },
-        
+
         /**
          * 设置坐标轴指示器样式 
          */
@@ -872,7 +871,7 @@ define(function (require) {
                         styleCurType.type = query(queryTarget, prefix + 'type') || styleCurType.type;
                     }
                 }
-                
+
                 if (pointType === 'line') {
                     var axisLineShape = this._axisLineShape;
                     var lineWidth = style.line.width;
@@ -1040,7 +1039,7 @@ define(function (require) {
             clearTimeout(this._showingTicket);
             this._hidingTicket = setTimeout(this._hide, this._hideDelay);
         },
-        
+
         /**
          * 异步回调填充内容
          */
@@ -1087,18 +1086,18 @@ define(function (require) {
                 };
             }
         },
-        
+
         ondragend: function () {
             this._hide();
         },
-        
+
         /**
          * 图例选择
          */
         onlegendSelected: function (param) {
             this._selectedMap = param.selected;
         },
-        
+
         _setSelectedMap: function () {
             var legend = this.legend;
             if (legend) {
@@ -1108,7 +1107,7 @@ define(function (require) {
                 this._selectedMap = {};
             }
         },
-        
+
         _isSelected: function (itemName) {
             var selectedMap = this._selectedMap;
             if (selectedMap[itemName] != null) {
@@ -1135,7 +1134,7 @@ define(function (require) {
         hideTip: function () {
             this._hide();
         },
-        
+
         /**
          * 刷新
          */
@@ -1179,7 +1178,7 @@ define(function (require) {
                 if (tooltipOption.trigger === 'axis') {
                     this._hasAxisTrigger = true;
                 }
-    
+
                 var series = this.option.series;
                 for (var i = 0, l = series.length; i < l; i++) {
                     if (query(series[i], 'tooltip.trigger') === 'axis') {
@@ -1225,9 +1224,9 @@ define(function (require) {
             this._tDom = null;
         }
     };
-    
+
     zrUtil.inherits(Tooltip, Base);
-    
+
     require('../component').define('tooltip', Tooltip);
 
     return Tooltip;

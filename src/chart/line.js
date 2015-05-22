@@ -2,7 +2,7 @@
  * echarts图表类：折线图
  *
  * @author Kener (@Kener-林峰, kener.linfeng@gmail.com)
- *  	   Yi Shen (https://github.com/pissang)
+ *         Yi Shen (https://github.com/pissang)
  * 
  * TODO
  *  - Large mode
@@ -121,7 +121,7 @@ define(function (require) {
             
             this.addShapeList();
         },
-            	
+
         /**
          * Build line chart in cartesian coordinate system
          * @private
@@ -131,9 +131,9 @@ define(function (require) {
             var stackDataMap = this._stackDataMap;
             
             zrUtil.each(this.series, function (series, idx) {
-    	        if (series.type === ecConfig.CHART_TYPE_LINE) {
+                if (series.type === ecConfig.CHART_TYPE_LINE) {
                     this.reformOption(series);
-    	           
+
                     var xAxisIndex = series.xAxisIndex;
                     var yAxisIndex = series.yAxisIndex;
                     var cartesian = grid.getCartesian(xAxisIndex, yAxisIndex);
@@ -213,7 +213,7 @@ define(function (require) {
             
             var zlevel = this.getZlevelBase();
             var z = this.getZBase();
-    	
+
             var polylineShape;
             var polygonShape;
             var currentPoints;
@@ -245,7 +245,7 @@ define(function (require) {
                     var polygonPoints = currentPoints.slice();
                     var firstPoint = polygonPoints[0];
                     var lastPoint = polygonPoints[pointLen - 1];
-        	       
+
                     // Add same point into polyline to fit polygon
                     currentPoints.unshift(firstPoint.slice());
                     currentPoints.push(lastPoint.slice());
@@ -431,7 +431,7 @@ define(function (require) {
                     }
                 }
             }
-            
+
             // Finish last segment
             finishSegment();
         },

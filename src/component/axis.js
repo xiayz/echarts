@@ -39,7 +39,7 @@ define(function (require) {
     var zrColor = require('zrender/tool/color');
 
     var component = require('../component');
-    
+
     var round = Math.round;
     /**************************************
      * 坐标轴配置项，分为数值型和类目型
@@ -101,7 +101,7 @@ define(function (require) {
             }
         }
     };
-    
+
     // 类目轴
     ecConfig.categoryAxis =  {
         zlevel: 0,                  // 一级层叠
@@ -402,7 +402,7 @@ define(function (require) {
             for (var i = 0; i < ticks.length; i++) {
                 var tick = ticks[i];
                 var tickCoord = axis.dataToCoord(tick);
-    	       
+
                 var label = tick;
                 if (option.type === 'category') {
                     label = option.data[tick];    
