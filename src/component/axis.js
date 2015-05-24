@@ -15,12 +15,12 @@
  * 
  * TODO 
  * - Time formattter
- * - Label rotation
  * - Label clickable and hightlight color
- * - boundaryGap
  * - min, max, splitNumber
  * - axisTick.onGap
  * - scale
+ * - valueAxis.boundaryGap
+ * - splitLine, splitArea visibility
  * 
  * - axisLine add halfLineWidth offset ?
  * 
@@ -327,7 +327,7 @@ define(function (require) {
             style.yStart = yStart;
             style.xEnd = xEnd;
             style.yEnd = yEnd;
-            if (option.name !== '') { // 别帮我代码规范
+            if (option.name) {
                 style.text = option.name;
                 style.textPosition = option.nameLocation;
                 style.textFont = this.getFont(nameTextStyleOption);
@@ -359,16 +359,18 @@ define(function (require) {
                 tickInterval = 0;
             }
 
+            var isOrdinalAxis = axis.scale.type === 'ordinal';
             // Sub pixel optimize
             var offset = round(tickLineWidth) % 2 / 2;
 
             var axisPosition = axis.position;
 
-            var ticksCoords = axis.getTicksCoords();
+            var ticksCoords = isOrdinalAxis && option.boundaryGap
+                ? axis.getBandsCoords(true) : axis.getTicksCoords();
 
             for (var i = 0; i < ticksCoords.length; i++) {
                 // Only ordinal scale support tick interval
-                if (axis.scale.type === 'ordinal') {
+                if (isOrdinalAxis) {
                     if (isTickIntervalFunction) {
                         if (! tickInterval(i, axis.scale.getItem(i))) {
                             continue;
@@ -457,6 +459,8 @@ define(function (require) {
 
             var labelInterval = labelOption.interval || 0;
             var isLabelIntervalFunction = typeof labelInterval === 'function';
+
+            var isOrdinalAxis = axis.scale.type === 'ordinal';
 
             var labelShowList = [];
 
@@ -594,7 +598,10 @@ define(function (require) {
             var x1 = grid.getXend();
             var y1 = grid.getYend();
 
-            var ticksCoords = axis.getTicksCoords();
+            var isOrdinalAxis = axis.scale.type === 'ordinal';
+            var ticksCoords = isOrdinalAxis && option.boundaryGap
+                ? axis.getBandsCoords(true) : axis.getTicksCoords();
+
             var shapeList = this.shapeList;
             var zlevel = this.getZlevelBase();
             var z = this.getZBase();
@@ -611,9 +618,9 @@ define(function (require) {
 
                 // Split line visiblity is affected bt axis tick
                 // PENDING
-                if (showList && ! showList[i]) {
-                    continue;
-                }
+                // if (showList && ! showList[i]) {
+                //     continue;
+                // }
 
                 var tickCoord = ticksCoords[i];
                 var x = tickCoord + offset;
@@ -673,8 +680,6 @@ define(function (require) {
                         shapeStyle.height = Math.abs(y - prevY);
                     }
                     shapeList.push(shape);
-
-                    console.log(shape);
                 }
 
                 prevX = x;

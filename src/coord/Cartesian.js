@@ -66,10 +66,10 @@ define(function (require) {
          * @param {number} data
          * @return {number}
          */
-        dataToCoord: function (data, clamp) {
+        dataToCoord: function (data) {
             data = this.scale.normalize(data);
 
-            return linearMap(data, [0, 1], this._coordExtent, clamp);
+            return linearMap(data, [0, 1], this._coordExtent);
         },
 
         /**
@@ -77,8 +77,8 @@ define(function (require) {
          * @param {number} coord
          * @return {number}
          */
-        coordToData: function (coord, clamp) {
-            var t = linearMap(coord, this._coordExtent, [0, 1], clamp);
+        coordToData: function (coord) {
+            var t = linearMap(coord, this._coordExtent, [0, 1]);
 
             return this.scale.scale(t);
         },
@@ -90,6 +90,37 @@ define(function (require) {
             return util.map(ticks, function (data) {
                 return this.dataToCoord(data);
             }, this);
+        },
+
+        /**
+         * Get coords of bands.
+         * If axis has ticks [1, 2, 3, 4]. Bands on the axis are
+         * |---1---|---2---|---3---|---4---|. And band coords is an array of coords
+         * where `|` is. It is useful when it has a ordinal scale.
+         *
+         * @param {boolean} margin
+         * If margin is true. Coord extent is start at the position of first tick and end 
+         * at the position of last tick
+         * @return {Array.<number>}
+         */
+        getBandsCoords: function (margin) {
+            var coordExtent = this._coordExtent;
+            var extent = this.scale.getExtent();
+            var coords = [];
+            var len = extent[1] - extent[0] + 1;
+            var startCoord = coordExtent[0];
+            var endCoord = coordExtent[1];
+            var size = endCoord - startCoord;
+
+            if (margin) {
+                var marginSize = size / (len * 2 - 1);
+                startCoord -= marginSize;
+                size += marginSize * 2;
+            }
+            for (var i = 0; i <= len; i++) {
+                coords.push(size * i / len + startCoord);
+            }
+            return coords;
         }
     };
 

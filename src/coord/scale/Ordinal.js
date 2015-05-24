@@ -92,7 +92,7 @@ define(function (require) {
 
             return ticks;
         },
-        
+
         /**
          * Get item on rank n
          */

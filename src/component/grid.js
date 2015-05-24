@@ -55,6 +55,8 @@ define(function (require) {
      * @param {Array.<number>} coordExtent
      * @param {string} axisType
      * @param {string} position
+     *
+     * @inner
      */
     var Axis2D = function (name, scale, coordExtent, axisType, position) {
         Axis.call(this, name, scale, coordExtent);
@@ -93,12 +95,11 @@ define(function (require) {
         
         constructor: Axis2D,
         
-        isHorizontal: function() {
+        isHorizontal: function () {
             var position = this.position;
             return position === 'top' || position === 'bottom';
         }
     };
-    
     zrUtil.inherits(Axis2D, Axis);
 
     /**
@@ -370,14 +371,14 @@ define(function (require) {
             /**
              * @inner
              */
-            var getCoordExtent = function (axisType, axisOption) {
+            var getCoordExtent = function (name, axisType, axisOption) {
                 var position = axisOption.position;
                 if (! position) {
                     // Default axis position:
                     //  x axis on the bottom and y axis on the left
                     if (
-                        (axisType === 'x' && isXHorizontal)
-                        || (axisType === 'y' && ! isXHorizontal)
+                        (name === 'x' && isXHorizontal)
+                        || (name === 'y' && ! isXHorizontal)
                     ) {
                         position = gridPositionOccupied.bottom ? 
                             'top ' : 'bottom';
@@ -391,42 +392,51 @@ define(function (require) {
                 // Take the position on the grid
                 gridPositionOccupied[position] = true;
 
+                var extent;
                 switch (position) {
                     case 'top':
-                        return [gridX, gridX + gridWidth, gridY, position];
-                    case 'bottom':
-                        return [gridX, gridX + gridWidth, gridY + gridHeight, position];
+                        extent = [gridX, gridX + gridWidth, gridY, position];
+                        break;
                     case 'left':
-                        return [gridY, gridY + gridHeight, gridX, position];
+                        extent = [gridY, gridY + gridHeight, gridX, position];
+                        break;
                     case 'right':
-                        return [gridY, gridY + gridHeight, gridX + gridWidth, position];
+                        extent = [gridY, gridY + gridHeight, gridX + gridWidth, position];
+                        break;
+                    default: // Bottom
+                        extent = [gridX, gridX + gridWidth, gridY + gridHeight, position];
+                        break;
                 }
+
+                // Category axis with boundary gap. Which label and points are on the center of bands
+                // Insead of on the tick
+                if (deepQuery([axisOption, ecConfig[axisType + 'Axis']], 'boundaryGap')
+                    && axisType === 'category') {
+                    var size = extent[1] - extent[0];
+                    var len = axisOption.data.length;
+                    var margin = size / (len * 2 + 1);
+                    extent[0] += margin;
+                    extent[1] -= margin;
+                }
+
+                return extent;
             };
 
-            var i;
-            var j;
-            var xAxisOpt;
-            var yAxisOpt;
-            var key;
-            var cartesian;
-            var coordExtent;
-            var axisX;
-            var axisY;
-            var horizontalAxis;
-            var verticalAxis;
-            for (i = 0; i < xAxesLen; i++) {
-                xAxisOpt = xAxesList[i];
-                for (j = 0; j < yAxesLen; j++) {
-                    yAxisOpt = yAxesList[j];
-                    key = 'x' + i + 'y' + j;
-                    cartesian = new Cartesian(key);
+            for (var i = 0; i < xAxesLen; i++) {
+                var xAxisOpt = xAxesList[i];
+                for (var j = 0; j < yAxesLen; j++) {
+                    var yAxisOpt = yAxesList[j];
+                    var key = 'x' + i + 'y' + j;
+                    var cartesian = new Cartesian(key);
                     this._coordsMap[key] = cartesian;
                     this._coordsList.push(cartesian);
 
+                    // X Axis is default category
+                    var xAxisType = xAxisOpt.type || 'category';
                     // Create x axis
-                    coordExtent = getCoordExtent('x', xAxisOpt);
-                    axisX = new Axis2D(
-                        'x', getScaleByOption(xAxisOpt.type, xAxisOpt),
+                    var coordExtent = getCoordExtent('x', xAxisType, xAxisOpt);
+                    var axisX = new Axis2D(
+                        'x', getScaleByOption(xAxisOpt, xAxisOpt),
                         coordExtent.slice(0, 2),
                         xAxisOpt.type,
                         coordExtent[3]
@@ -435,10 +445,12 @@ define(function (require) {
                     cartesian.addAxis(axisX);
                     this._axes['x' + i] = axisX;
 
+                    // X Axis is default value
+                    var yAxisType = yAxisOpt.type || 'value';
                     // Create y axis
-                    coordExtent = getCoordExtent('y', yAxisOpt);
-                    axisY = new Axis2D(
-                        'y', getScaleByOption(yAxisOpt.type, yAxisOpt),
+                    var coordExtent = getCoordExtent('y', yAxisType, yAxisOpt);
+                    var axisY = new Axis2D(
+                        'y', getScaleByOption(yAxisType, yAxisOpt),
                         coordExtent.slice(0, 2),
                         yAxisOpt.type,
                         coordExtent[3]
@@ -450,6 +462,8 @@ define(function (require) {
                     axisX.otherAxis = axisY;
                     axisY.otherAxis = axisX;
 
+                    var horizontalAxis;
+                    var verticalAxis;
                     // Adjust axis direction
                     if (axisX.isHorizontal()) {
                         horizontalAxis = axisX;
@@ -482,8 +496,9 @@ define(function (require) {
                 var nameShort = axis.type;
                 var name = nameShort + 'Axis';
                 var onZero = deepQuery([option, ecConfig], name + '.axisLine.onZero');
-                if (onZero) {
-                    axis.otherCoord = axis.otherAxis.dataToCoord(0);
+                var otherAxis = axis.otherAxis;
+                if (onZero && otherAxis.type !== 'category') {
+                    axis.otherCoord = otherAxis.dataToCoord(0);
                 }
             });
         },
@@ -541,7 +556,6 @@ define(function (require) {
                     if (! (data && data.length)) {
                         return;
                     }
-                    // TODO
                     var categoryAxis = cartesian.getAxesByScale('ordinal');
                     categoryAxis = categoryAxis[0];
                     var valueAxisName;
