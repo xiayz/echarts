@@ -96,11 +96,11 @@ define(function (require) {
          * Get coords of bands.
          * If axis has ticks [1, 2, 3, 4]. Bands on the axis are
          * |---1---|---2---|---3---|---4---|. And band coords is an array of coords
-         * where `|` is. It is useful when it has a ordinal scale.
+         * where `|` is. It is useful when axis has an ordinal scale.
          *
-         * @param {boolean} margin
+         * @param {boolean} [margin=false]
          * If margin is true. Coord extent is start at the position of first tick and end 
-         * at the position of last tick
+         * at the position of last tick.
          * @return {Array.<number>}
          */
         getBandsCoords: function (margin) {
@@ -113,7 +113,7 @@ define(function (require) {
             var size = endCoord - startCoord;
 
             if (margin) {
-                var marginSize = size / (len * 2 - 1);
+                var marginSize = size / (len * 2 - 2);
                 startCoord -= marginSize;
                 size += marginSize * 2;
             }
@@ -121,6 +121,23 @@ define(function (require) {
                 coords.push(size * i / len + startCoord);
             }
             return coords;
+        },
+
+        /**
+         * Get width of band
+         * @param  {boolean} margin
+         * @return {number}
+         */
+        getBandWidth: function (margin) {
+            var coordExtent = this._coordExtent;
+            var extent = this.scale.getExtent();
+            var len = extent[1] - extent[0] + 1;
+
+            var size = coordExtent[1] - coordExtent[0];
+            if (margin) {
+                size += size / (len - 1);
+            }
+            return Math.abs(size) / len;
         }
     };
 

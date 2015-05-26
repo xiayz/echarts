@@ -114,7 +114,7 @@ define(function (require) {
 
         this._coordsList = [];
 
-        this._axes = {};
+        this._axesList = [];
 
         this.refresh(option);
     }
@@ -243,16 +243,6 @@ define(function (require) {
             return this._coordsMap[key];
         },
 
-        /**
-         * Get axis instance
-         * @param  {number} xIndex
-         * @param  {number} yIndex
-         * @return {module:echarts/coord/Cartesian.Axis}
-         */
-        getAxis: function (name, index) {
-            return this._axes[name + index];
-        },
-        
         /**
          * Convert series data to coorindates 
          * @param {Array} data
@@ -414,7 +404,7 @@ define(function (require) {
                     && axisType === 'category') {
                     var size = extent[1] - extent[0];
                     var len = axisOption.data.length;
-                    var margin = size / (len * 2 + 1);
+                    var margin = size / len / 2;
                     extent[0] += margin;
                     extent[1] -= margin;
                 }
@@ -443,7 +433,6 @@ define(function (require) {
                     );
                     axisX.otherCoord = coordExtent[2];
                     cartesian.addAxis(axisX);
-                    this._axes['x' + i] = axisX;
 
                     // X Axis is default value
                     var yAxisType = yAxisOpt.type || 'value';
@@ -457,7 +446,6 @@ define(function (require) {
                     );
                     axisY.otherCoord = coordExtent[2];
                     cartesian.addAxis(axisY);
-                    this._axes['y' + i] = axisY;
                     
                     axisX.otherAxis = axisY;
                     axisY.otherAxis = axisX;
@@ -481,18 +469,21 @@ define(function (require) {
                         // Reverse horizontal axis to right-left direction
                         horizontalAxis.reverse();
                     }
+
+                    this._axesList.push(axisX);
+                    this._axesList.push(axisY);
                 }
             }
 
             this._updateCartesianFromSeries(option.series);
 
             // Set axis from option
-            zrUtil.each(this._axes, function (axis) {
+            zrUtil.each(this._axesList, function (axis) {
                 axis.scale.niceExtent();
             });
 
             // Adjust axis coord on the zero position of the other axis
-            zrUtil.each(this._axes, function (axis) {
+            zrUtil.each(this._axesList, function (axis) {
                 var nameShort = axis.type;
                 var name = nameShort + 'Axis';
                 var onZero = deepQuery([option, ecConfig], name + '.axisLine.onZero');
