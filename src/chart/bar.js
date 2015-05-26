@@ -127,7 +127,8 @@ define(function (require) {
 
             var barWidthAndOffset = this._calBarWidthAndOffset(cartesianBarSeries);
             var stackDataMap = {};
-            var lastStackPoints = {};
+            var lastPositiveStackPoints = {};
+            var lastNegativeStackPoints = {};
             zrUtil.each(cartesianBarSeries, function (series) {
                 var xAxisIndex = series.xAxisIndex;
                 var yAxisIndex = series.yAxisIndex;
@@ -184,14 +185,23 @@ define(function (require) {
 
                 var stackKey = cartesian.name + stack;
 
+                if (! lastPositiveStackPoints[stackKey]) {
+                    lastPositiveStackPoints[stackKey] = [];
+                }
+                if (! lastNegativeStackPoints[stackKey]) {
+                    lastNegativeStackPoints[stackKey] = [];
+                }
+
                 for (var i = 0; i < data.length; i++) {
                     var value = queryValue(data[i], '-');
                     var name = categoryAxis.scale.getItem(i);
 
-                    var lastCoord = lastStackPoints[stackKey]
-                        ? lastStackPoints[stackKey][i][isHorizontal ? 1 : 0]
-                        : categoryAxis.otherCoord;
+                    var lastStackPoints = value > 0 ? lastPositiveStackPoints : lastNegativeStackPoints;
                     if (value !== '-') {
+                        var lastCoord = lastStackPoints[stackKey][i]
+                            ? lastStackPoints[stackKey][i][isHorizontal ? 1 : 0]
+                            : projectAxis.otherCoord;
+
                         var point = points[i];
                         var x;
                         var y;
@@ -213,13 +223,14 @@ define(function (require) {
                             seriesIndex, i, name, x, y, width, height, isHorizontal ? 'horizontal' : 'vertical'
                         );
                         this.shapeList.push(shape);
+
+                        lastStackPoints[stackKey][i] = point;
                     }
                     else {
 
                     }
                 }
 
-                lastStackPoints[stackKey] = points;
             }, this);
         },
 
@@ -283,19 +294,19 @@ define(function (require) {
                 result[name] = {};
 
                 var categoryGap = columnsOnAxis.categoryGap;
-                var barGap = columnsOnAxis.gap;
+                var barGapPercent = columnsOnAxis.gap;
                 var categoryAxis = columnsOnAxis.axis;
                 var bandWidth = categoryAxis.getBandWidth(true);
                 if (typeof categoryGap === 'string') {
                     categoryGap = (parseFloat(categoryGap) / 100) * bandWidth;
                 }
-                if (typeof (barGap === 'string')) {
-                    barGap = parseFloat(barGap) / 100;
+                if (typeof (barGapPercent === 'string')) {
+                    barGapPercent = parseFloat(barGapPercent) / 100;
                 }
 
                 var remainedWidth = columnsOnAxis.remainedWidth;
                 var autoWidthCount = columnsOnAxis.autoWidthCount;
-                var autoWidth = (remainedWidth - categoryGap) / (autoWidthCount + (autoWidthCount - 1) * barGap);
+                var autoWidth = (remainedWidth - categoryGap) / (autoWidthCount + (autoWidthCount - 1) * barGapPercent);
                 autoWidth = Math.max(autoWidth, 0);
 
                 // Find if any auto calculated bar exceeded maxBarWidth
@@ -310,7 +321,7 @@ define(function (require) {
                 });
 
                 // Recalculate width again
-                autoWidth = (remainedWidth - categoryGap) / (autoWidthCount + (autoWidthCount - 1) * barGap);
+                autoWidth = (remainedWidth - categoryGap) / (autoWidthCount + (autoWidthCount - 1) * barGapPercent);
                 autoWidth = Math.max(autoWidth, 0);
 
                 zrUtil.each(columnsOnAxis.stacks, function (column, stack) {
@@ -327,7 +338,7 @@ define(function (require) {
                         axis: columnsOnAxis.axis
                     };
 
-                    offset += column.width + barGap;
+                    offset += column.width * (1 + barGapPercent);
                 });
             });
 
