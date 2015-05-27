@@ -7,7 +7,6 @@
  * TODO
  *  - Large mode
  *  - markPoint
- *  - Calcucalable, dragover not work
  *  - ontooltipHover
  *  - addDataAnimation
  */
@@ -116,9 +115,27 @@ define(function (require) {
                 this.option = newOption;
                 this.series = newOption.series;
             }
-            
-            this._buildCartesian();
-            
+
+            var legend = this.component.legend;
+
+            zrUtil.each(this.series, function (series, idx) {
+                if (series.type === ecConfig.CHART_TYPE_LINE) {
+                    this.reformOption(series);
+
+                    var selected = legend ? legend.isSelected(series.name) : true;
+                    this.selectedMap[series.name] = selected;
+
+                    if (! selected) {
+                        return;
+                    }
+
+                    var coordinateSystem = series.coordinateSystem;
+                    if (coordinateSystem === 'cartesian') {
+                        this._buildCartesianSeries(series, idx);
+                    }
+                }
+            }, this);
+
             this.addShapeList();
         },
 
@@ -126,55 +143,49 @@ define(function (require) {
          * Build line chart in cartesian coordinate system
          * @private
          */
-        _buildCartesian: function () {
+        _buildCartesianSeries: function (series, seriesIndex) {
             var grid = this.component.grid;
             var stackDataMap = this._stackDataMap;
+
+            var xAxisIndex = series.xAxisIndex;
+            var yAxisIndex = series.yAxisIndex;
+            var cartesian = grid.getCartesian(xAxisIndex, yAxisIndex);
+            var data = series.data;
             
-            zrUtil.each(this.series, function (series, idx) {
-                if (series.type === ecConfig.CHART_TYPE_LINE) {
-                    this.reformOption(series);
+            // Chart with two value axes doesn't support stacking
+            if (series.stack && cartesian.getAxesByScale('ordinal').length) {
+                var dataStacked = [];
+                var stackKey = cartesian.name + series.stack;
+                var stackData = stackDataMap[stackKey];
+                stackData = stackData || {
+                    // Positive stacking
+                    p: [],
+                    // Negative stacking
+                    n: []
+                };
+                stackDataMap[stackKey] = stackData;
 
-                    var xAxisIndex = series.xAxisIndex;
-                    var yAxisIndex = series.yAxisIndex;
-                    var cartesian = grid.getCartesian(xAxisIndex, yAxisIndex);
-                    var data = series.data;
-                    
-                    // Chart with two value axes doesn't support stacking
-                    if (series.stack && cartesian.getAxesByScale('ordinal').length) {
-                        var dataStacked = [];
-                        var stackKey = cartesian.name + series.stack;
-                        var stackData = stackDataMap[stackKey];
-                        stackData = stackData || {
-                            // Positive stacking
-                            p: [],
-                            // Negative stacking
-                            n: []
-                        };
-                        stackDataMap[stackKey] = stackData;
-                        
-                        var positiveStack = stackData.p;
-                        var negativeStack = stackData.n;
-                        for (var i = 0; i < data.length; i++) {
-                            var value = queryValue(data[i], 0);
-                            positiveStack[i] = positiveStack[i] || 0;
-                            negativeStack[i] = negativeStack[i] || 0;
-                            if (value > 0) {
-                                dataStacked[i] = value + positiveStack[i];
-                                positiveStack[i] = dataStacked[i];
-                            }
-                            else {
-                                dataStacked[i] = value + negativeStack[i];
-                                negativeStack[i] = dataStacked[i];
-                            }
-                        }
-
-                        data = dataStacked;
+                var positiveStack = stackData.p;
+                var negativeStack = stackData.n;
+                for (var i = 0; i < data.length; i++) {
+                    var value = queryValue(data[i], 0);
+                    positiveStack[i] = positiveStack[i] || 0;
+                    negativeStack[i] = negativeStack[i] || 0;
+                    if (value > 0) {
+                        dataStacked[i] = value + positiveStack[i];
+                        positiveStack[i] = dataStacked[i];
                     }
-
-                    var points = grid.dataToCoords(data, xAxisIndex, yAxisIndex);
-                    this._buildSeriesShapes(idx, points, cartesian);
+                    else {
+                        dataStacked[i] = value + negativeStack[i];
+                        negativeStack[i] = dataStacked[i];
+                    }
                 }
-            }, this);
+
+                data = dataStacked;
+            }
+
+            var points = grid.dataToCoords(data, xAxisIndex, yAxisIndex);
+            this._buildSeriesShapes(seriesIndex, points, cartesian);
         },
 
         /**
@@ -420,8 +431,9 @@ define(function (require) {
                             x, y,
                             orient
                         );
+                        this.setCalculable(symbolShape);
                         symbolShape.hoverable = false;
-                        symbolShape.style.text = false;
+                        symbolShape.style.text = undefined;
                         symbolShape.rotation = [0, 0];
                         
                         shapeList.push(symbolShape);
@@ -465,12 +477,13 @@ define(function (require) {
          * 大规模pointList优化
          * TODO 使用 data
          */
-        _getLargePointList: function(orient, points, filter) {
+        _getLargeDataList: function(orient, dataList, filter) {
             var grid = this.component.grid;
-            var total = orient === 'horizontal'
+            var isHorizontal = orient === 'horizontal';
+            var total = isHorizontal
                 ? grid.getWidth() : grid.getHeight();
             
-            var len = points.length;
+            var len = dataList.length;
             var newList = [];
 
             if (typeof(filter) != 'function') {
@@ -510,8 +523,7 @@ define(function (require) {
                 }
 
                 for (var j = idx0; j < idx1; j++) {
-                    windowData[j - idx0] = orient === 'horizontal'
-                        ? points[j][1] : points[j][0];
+                    windowData[j - idx0] = dataList[j];
                 }
 
                 windowData.length = idx1 - idx0;
@@ -520,8 +532,7 @@ define(function (require) {
                 var minDist = Infinity;
                 // 寻找值最相似的点，使用其其它属性
                 for (var j = idx0; j < idx1; j++) {
-                    var val = orient === 'horizontal'
-                        ? points[j][1] : points[j][0];
+                    var val = dataList[j];
                     var dist = Math.abs(val - filteredVal);
                     if (dist < minDist) {
                         nearestIdx = j;
@@ -529,14 +540,7 @@ define(function (require) {
                     }
                 }
 
-                var newItem = points[nearestIdx].slice();
-                if (orient === 'horizontal') {
-                    newItem[1] = filteredVal;
-                }
-                else {
-                    newItem[0] = filteredVal;
-                }
-                newList.push(newItem);
+                newList.push(dataList[nearestIdx]);
             }
             return newList;
         },
@@ -545,13 +549,13 @@ define(function (require) {
         // TODO
         getMarkCoord: function (seriesIndex, mpData) {
             var series = this.series[seriesIndex];
-            var xMarkMap = this.xMarkMap[seriesIndex];
             
             var markerType = mpData.type;
 
             if (markerType
                 && (markerType === 'max' || markerType === 'min' || markerType === 'average')
             ) {
+                
             }
             
             return [
