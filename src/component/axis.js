@@ -21,6 +21,7 @@
  * - scale
  * - valueAxis.boundaryGap
  * - splitLine, splitArea visibility
+ * - precision
  * 
  * - axisLine add halfLineWidth offset ?
  * 
@@ -245,7 +246,9 @@ define(function (require) {
                     ecConfig[key]
                 );
 
-                var axis = grid.getAxis(axisTypeShort, i);
+                var cartesian = axisTypeShort === 'x' ?
+                    grid.getCartesian(i, 0) : grid.getCartesian(0, i);
+                var axis = cartesian.getAxis(axisTypeShort);
                 this._buildShape(axis, axisOption);
             }
         },
@@ -327,7 +330,7 @@ define(function (require) {
             style.yStart = yStart;
             style.xEnd = xEnd;
             style.yEnd = yEnd;
-            if (option.name) {
+            if (option.name || option.name === 0) {
                 style.text = option.name;
                 style.textPosition = option.nameLocation;
                 style.textFont = this.getFont(nameTextStyleOption);
@@ -470,29 +473,29 @@ define(function (require) {
                 labelShowList[i] = false;
 
                 var needsCheckTextSpace = false;
+                var tick = ticks[i];
                 // Only ordinal scale support label interval
                 if (axis.scale.type === 'ordinal') {
                     if (labelInterval === 'auto') {
                         needsCheckTextSpace = true;
                     }
                     else if (isLabelIntervalFunction) {
-                        if (! labelInterval(i, axis.scale.getItem(i))) {
+                        if (! labelInterval(tick, axis.scale.getItem(tick))) {
                             continue;
                         }
                     }
                     else {
-                        if (i % (labelInterval + 1)) {
+                        if (tick % (labelInterval + 1)) {
                             continue;
                         }
                     }
                 }
 
-                var tick = ticks[i];
                 var tickCoord = axis.dataToCoord(tick);
 
                 var label = tick;
                 if (option.type === 'category') {
-                    label = option.data[tick];    
+                    label = axis.scale.getItem(tick);    
                 }
                 else if (option.type === 'time') {
                     // TODO
@@ -679,6 +682,7 @@ define(function (require) {
                         shapeStyle.width = x1 - x0;
                         shapeStyle.height = Math.abs(y - prevY);
                     }
+
                     shapeList.push(shape);
                 }
 
