@@ -1126,6 +1126,187 @@ define(function (require) {
          * TODO
          */
         showTip: function (params) {
+            if (!params) {
+                return;
+            }
+            
+            var seriesIndex;
+            var series = this.option.series;
+            if (params.seriesIndex != null) {
+                seriesIndex = params.seriesIndex;
+            }
+            else {
+                var seriesName = params.seriesName;
+                for (var i = 0, l = series.length; i < l; i++) {
+                    if (series[i].name === seriesName) {
+                        seriesIndex = i;
+                        break;
+                    }
+                }
+            }
+            
+            var serie = series[seriesIndex];
+            if (serie == null) {
+                return;
+            }
+            var chart = this.myChart.chart[serie.type];
+            var isAxisTrigger = this.deepQuery(
+                                    [serie, this.option], 'tooltip.trigger'
+                                ) === 'axis';
+            
+            if (!chart) {
+                return;
+            }
+            
+            if (isAxisTrigger) {
+                // axis trigger
+                var dataIndex = params.dataIndex;
+                switch (chart.type) {
+                    case ecConfig.CHART_TYPE_LINE :
+                    case ecConfig.CHART_TYPE_BAR :
+                    case ecConfig.CHART_TYPE_K :
+                    case ecConfig.CHART_TYPE_RADAR :
+                        if (this.component.polar == null 
+                            || serie.data[0].value.length <= dataIndex
+                        ) {
+                            return;
+                        }
+                        var polarIndex = serie.polarIndex || 0;
+                        var vector = this.component.polar.getVector(
+                            polarIndex, dataIndex, 'max'
+                        );
+                        this._event = {
+                            zrenderX: vector[0],
+                            zrenderY: vector[1]
+                        };
+                        this._showPolarTrigger(
+                            polarIndex, 
+                            dataIndex
+                        );
+                        break;
+                }
+            }
+            else {
+                // item trigger
+                var shapeList = chart.shapeList;
+                var x;
+                var y;
+                switch (chart.type) {
+                    case ecConfig.CHART_TYPE_LINE :
+                    case ecConfig.CHART_TYPE_BAR :
+                    case ecConfig.CHART_TYPE_K :
+                    case ecConfig.CHART_TYPE_TREEMAP :
+                    case ecConfig.CHART_TYPE_SCATTER :
+                        var dataIndex = params.dataIndex;
+                        for (var i = 0, l = shapeList.length; i < l; i++) {
+                            if (shapeList[i]._mark == null
+                                && ecData.get(shapeList[i], 'seriesIndex') == seriesIndex
+                                && ecData.get(shapeList[i], 'dataIndex') == dataIndex
+                            ) {
+                                this._curTarget = shapeList[i];
+                                x = shapeList[i].style.x;
+                                y = chart.type != ecConfig.CHART_TYPE_K 
+                                    ? shapeList[i].style.y : shapeList[i].style.y[0];
+                                break;
+                            }
+                        }
+                        break;
+                    case ecConfig.CHART_TYPE_RADAR :
+                        var dataIndex = params.dataIndex;
+                        for (var i = 0, l = shapeList.length; i < l; i++) {
+                            if (shapeList[i].type === 'polygon'
+                                && ecData.get(shapeList[i], 'seriesIndex') == seriesIndex
+                                && ecData.get(shapeList[i], 'dataIndex') == dataIndex
+                            ) {
+                                this._curTarget = shapeList[i];
+                                var vector = this.component.polar.getCenter(
+                                    serie.polarIndex || 0
+                                );
+                                x = vector[0];
+                                y = vector[1];
+                                break;
+                            }
+                        }
+                        break;
+                    case ecConfig.CHART_TYPE_PIE :
+                        var name = params.name;
+                        for (var i = 0, l = shapeList.length; i < l; i++) {
+                            if (shapeList[i].type === 'sector'
+                                && ecData.get(shapeList[i], 'seriesIndex') == seriesIndex
+                                && ecData.get(shapeList[i], 'name') == name
+                            ) {
+                                this._curTarget = shapeList[i];
+                                var style = this._curTarget.style;
+                                var midAngle = (style.startAngle + style.endAngle) 
+                                                / 2 * Math.PI / 180;
+                                x = this._curTarget.style.x + Math.cos(midAngle) * style.r / 1.5;
+                                y = this._curTarget.style.y - Math.sin(midAngle) * style.r / 1.5;
+                                break;
+                            }
+                        }
+                        break;
+                    case ecConfig.CHART_TYPE_MAP :
+                        var name = params.name;
+                        var mapType = serie.mapType;
+                        for (var i = 0, l = shapeList.length; i < l; i++) {
+                            if (shapeList[i].type === 'text'
+                                && shapeList[i]._mapType === mapType
+                                && shapeList[i].style._name === name
+                            ) {
+                                this._curTarget = shapeList[i];
+                                x = this._curTarget.style.x + this._curTarget.position[0];
+                                y = this._curTarget.style.y + this._curTarget.position[1];
+                                break;
+                            }
+                        }
+                        break;
+                    case ecConfig.CHART_TYPE_CHORD:
+                        var name = params.name;
+                        for (var i = 0, l = shapeList.length; i < l; i++) {
+                            if (shapeList[i].type === 'sector'
+                                && ecData.get(shapeList[i], 'name') == name
+                            ) {
+                                this._curTarget = shapeList[i];
+                                var style = this._curTarget.style;
+                                var midAngle = (style.startAngle + style.endAngle) 
+                                                / 2 * Math.PI / 180;
+                                x = this._curTarget.style.x + Math.cos(midAngle) * (style.r - 2);
+                                y = this._curTarget.style.y - Math.sin(midAngle) * (style.r - 2);
+                                this.zr.trigger(
+                                    zrConfig.EVENT.MOUSEMOVE,
+                                    {
+                                        zrenderX: x,
+                                        zrenderY: y
+                                    }
+                                );
+                                return;
+                            }
+                        }
+                        break;
+                    case ecConfig.CHART_TYPE_FORCE:
+                        var name = params.name;
+                        for (var i = 0, l = shapeList.length; i < l; i++) {
+                            if (shapeList[i].type === 'circle'
+                                && ecData.get(shapeList[i], 'name') == name
+                            ) {
+                                this._curTarget = shapeList[i];
+                                x = this._curTarget.position[0];
+                                y = this._curTarget.position[1];
+                                break;
+                            }
+                        }
+                        break;
+                }
+                if (x != null && y != null) {
+                    this._event = {
+                        zrenderX: x,
+                        zrenderY: y
+                    };
+                    this.zr.addHoverShape(this._curTarget);
+                    this.zr.refreshHover();
+                    this._showItemTrigger();
+                }
+            }
         },
         
         /**

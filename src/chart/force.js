@@ -270,7 +270,6 @@ define(function (require) {
                 this.query('markPoint.effect.show')
                 || this.query('markLine.effect.show')
             ) {
-                // 斗胆修改 EFFECT 层配置项
                 this.zr.modLayer(ecConfig.EFFECT_ZLEVEL, {
                     panable: panable,
                     zoomable: zoomable
@@ -735,7 +734,9 @@ define(function (require) {
                             brushType: 'fill'
                         },
                         position: [0, 0],
-                        rotation: 0
+                        rotation: 0,
+                        zlevel: this.getZlevelBase(),
+                        z: this.getZBase()
                     });
                     linkShape._symbolShape = symbolShape;
                     this.shapeList.push(symbolShape);

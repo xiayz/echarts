@@ -1234,6 +1234,7 @@ define(function (require) {
             if (this.type != ecConfig.CHART_TYPE_MAP
                 && this.type != ecConfig.CHART_TYPE_TREEMAP
                 && this.type != ecConfig.CHART_TYPE_VENN
+                && this.type != ecConfig.CHART_TYPE_TREE
                 ) {
                 return ecData.get(shape, 'seriesIndex') + '_'
                        + ecData.get(shape, 'dataIndex')
