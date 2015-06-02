@@ -1,0 +1,88 @@
+<!Doctype html>
+<html>
+<head>
+    <script src="http://s1.bdstatic.com/r/www/cache/ecom/esl/1-8-8/esl.js"></script>
+    <meta charset="utf-8">
+</head>
+<style>
+    html, body {
+        height: 100%;
+        margin: 0px;
+    }
+    #main {
+        width: 100%;
+        height: 100%;
+    }
+</style>
+<body>
+    <div id="main"></div>
+</body>
+<script>
+    require.config({
+        packages: [{
+            name: 'echarts',
+            location: '../src',
+            main: 'echarts'
+        }, {
+            name: 'zrender',
+            location: '../../zrender/src',
+            main: 'zrender'
+        }]
+    });
+
+    require(['echarts', 'echarts/chart/bar'], function (echarts) {
+        var myChart = echarts.init(document.getElementById('main'));
+        myChart.setOption({
+            calculable: true,
+            xAxis: {
+                type: 'category',
+                // position: 'top',
+                data: ['一月', '二月', '三月', '四月', '五月', '六月'],
+                axisLabel: {
+                    // rotate: -10
+                },
+                splitArea: {
+                    show: true
+                },
+                position: 'right'
+            },
+            yAxis: {
+                // position: 'right',
+                position: 'top',
+                type: 'value'
+            },
+            tooltip: {
+                trigger: 'axis'
+            },
+            series: [{
+                symbolSize: 5,
+                name: '测试',
+                type: 'bar',
+                data: [-30, -25, '-', 30, -22.3, 77.8],
+                smooth: true,
+                stack: '总量',
+                itemStyle: {
+                    normal: {
+                        areaStyle: {
+                            
+                        }
+                    }
+                }
+            }, {
+                name: '测试2',
+                type: 'bar',
+                data: [15, 20, 13, 25, 24.3, 70],
+                smooth: true,
+                stack: '总量',
+                itemStyle: {
+                    normal: {
+                        areaStyle: {
+                            
+                        }
+                    }
+                }
+            }]
+        });
+    });
+</script>
+</html>
